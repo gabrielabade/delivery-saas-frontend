@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Menu, X, Check, ArrowRight, Smartphone, TrendingUp, Shield, Zap, Store, ChefHat, Bell, Rocket, Users, LineChart, Percent, Star, CheckCircle2, Play } from 'lucide-react';
+import { Menu, X, Check, ArrowRight, Smartphone, TrendingUp, Shield, Zap, Store, CreditCard, ChefHat, Bell, Rocket, Users, LineChart, Clock, Percent, Star, CheckCircle2, Play } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 function Landing() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -262,12 +263,13 @@ function Landing() {
               <a href="#depoimentos" className="text-slate-700 hover:text-red-600 transition-colors font-medium text-sm lg:text-base">
                 Casos de Sucesso
               </a>
-              <a href="#" className="text-slate-700 hover:text-red-600 transition-colors font-medium text-sm lg:text-base">
+              <Link to="/login" className="text-slate-700 hover:text-red-600 transition-colors font-medium text-sm lg:text-base">
                 Entrar
-              </a>
-              <a href="#planos" className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-orange-500 text-white rounded-lg hover:shadow-xl hover:scale-105 transition-all font-bold text-sm lg:text-base">
+              </Link>
+
+              <Link to="/login" className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-orange-500 text-white rounded-lg hover:shadow-xl hover:scale-105 transition-all font-bold text-sm lg:text-base">
                 Teste Grátis
-              </a>
+              </Link>
             </div>
 
             {/* Mobile Menu Button */}
@@ -293,9 +295,9 @@ function Landing() {
                 <a href="#depoimentos" className="text-slate-700 font-medium px-4 py-3 hover:bg-slate-50 rounded-lg transition-all">
                   Casos de Sucesso
                 </a>
-                <a href="#" className="text-slate-700 font-medium px-4 py-3 hover:bg-slate-50 rounded-lg transition-all">
+                <Link to="/login" className="text-slate-700 font-medium px-4 py-3 hover:bg-slate-50 rounded-lg transition-all">
                   Entrar
-                </a>
+                </Link>
                 <a href="#planos" className="px-6 py-3 bg-gradient-to-r from-red-600 to-orange-500 text-white rounded-lg font-bold text-center">
                   Teste Grátis 14 Dias
                 </a>
