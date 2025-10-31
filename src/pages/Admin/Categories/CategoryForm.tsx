@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useStore } from '../../../contexts/StoreContext';
 import categoryService, { CategoryCreate, CategoryUpdate } from '../../../services/category.service';
-import { ArrowLeft, Save, AlertCircle } from 'lucide-react';
+import { ArrowLeft, AlertCircle } from 'lucide-react';
 
 export default function CategoryForm() {
   const { currentStoreId } = useStore();

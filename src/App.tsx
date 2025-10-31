@@ -1,3 +1,4 @@
+// App.tsx
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { StoreProvider } from './contexts/StoreContext';
@@ -7,6 +8,9 @@ import Login from './pages/Auth/Login';
 import Dashboard from './pages/Admin/Dashboard';
 import CategoryList from './pages/Admin/Categories/CategoryList';
 import CategoryForm from './pages/Admin/Categories/CategoryForm';
+// Importações dos produtos
+import ProductList from './pages/Admin/Products/ProductList';
+import ProductForm from './pages/Admin/Products/ProductForm';
 
 function App() {
   return (
@@ -50,6 +54,32 @@ function App() {
               element={
                 <ProtectedRoute allowedRoles={['PLATFORM_ADMIN', 'COMPANY_ADMIN', 'STORE_MANAGER']}>
                   <CategoryForm />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Produtos */}
+            <Route
+              path="/admin/products"
+              element={
+                <ProtectedRoute allowedRoles={['PLATFORM_ADMIN', 'COMPANY_ADMIN', 'STORE_MANAGER']}>
+                  <ProductList />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/products/new"
+              element={
+                <ProtectedRoute allowedRoles={['PLATFORM_ADMIN', 'COMPANY_ADMIN', 'STORE_MANAGER']}>
+                  <ProductForm />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/products/edit/:id"
+              element={
+                <ProtectedRoute allowedRoles={['PLATFORM_ADMIN', 'COMPANY_ADMIN', 'STORE_MANAGER']}>
+                  <ProductForm />
                 </ProtectedRoute>
               }
             />
