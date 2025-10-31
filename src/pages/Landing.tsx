@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Menu, X, Check, ArrowRight, Smartphone, TrendingUp, Shield, Zap, Store, CreditCard, ChefHat, Bell, Rocket, Users, LineChart, Clock, Percent, Star, CheckCircle2, Play } from 'lucide-react';
+import { Menu, X, Check, ArrowRight, Smartphone, TrendingUp, Shield, Zap, Store, ChefHat, Bell, Rocket, Users, LineChart, Percent, Star, CheckCircle2, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 function Landing() {
