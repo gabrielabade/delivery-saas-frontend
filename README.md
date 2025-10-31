@@ -729,7 +729,7 @@ Todos os direitos reservados © 2024
 ## 👥 Equipe
 
 - **Frontend:** Gabriela (React/TypeScript)
-- **Backend:** [Nome] (Python/FastAPI)
+- **Backend:** Bruno (Python/FastAPI)
 
 ---
 
