@@ -720,7 +720,7 @@ git push origin feature/nome-da-feature
 
 ## 📝 Licença
 
-Este projeto é proprietário da **GBConnect Digital**.
+Este projeto é proprietário da **GB Connect Digital**.
 
 Todos os direitos reservados © 2024
 
@@ -735,7 +735,7 @@ Todos os direitos reservados © 2024
 
 ## 📞 Suporte
 
-- **Email:** contato@gbconnect.digital
+- **Email:** gbconnect@gmail.com
 - **Site:** https://gbconnect.digital
 
 ---
