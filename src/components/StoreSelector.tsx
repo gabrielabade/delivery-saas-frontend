@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 import { Store, ChevronDown, Check } from 'lucide-react';
 
-interface Company {
+interface stores {
   id: number;
   name: string;
   subdomain: string;
@@ -12,7 +12,7 @@ interface Company {
 
 export default function StoreSelector() {
   const { currentStoreId, setCurrentStoreId, canManageMultipleStores } = useStore();
-  const [stores, setStores] = useState<Company[]>([]);
+  const [stores, setStores] = useState<stores[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
 
@@ -26,7 +26,7 @@ export default function StoreSelector() {
 
   const loadStores = async () => {
     try {
-      const response = await api.get<Company[]>('/companies/');
+      const response = await api.get<stores[]>('/stores/');
       setStores(response.data);
 
       // Se não tem loja selecionada e tem lojas disponíveis, seleciona a primeira
