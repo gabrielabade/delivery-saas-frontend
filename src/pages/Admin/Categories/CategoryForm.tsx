@@ -1,8 +1,9 @@
+// pages/Admin/Categories/CategoryForm.tsx
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useStore } from '../../../contexts/StoreContext';
 import categoryService, { CategoryCreate, CategoryUpdate } from '../../../services/category.service';
-import { ArrowLeft, AlertCircle } from 'lucide-react';
+import { ArrowLeft, AlertCircle, Save } from 'lucide-react';
 
 export default function CategoryForm() {
   const { currentStoreId } = useStore();
@@ -30,6 +31,7 @@ export default function CategoryForm() {
   const loadCategory = async (categoryId: number) => {
     try {
       setLoading(true);
+      setError('');
       const data = await categoryService.getById(categoryId, currentStoreId!);
       setFormData({
         name: data.name,
@@ -37,8 +39,8 @@ export default function CategoryForm() {
         image_url: data.image_url || '',
         sort_order: data.sort_order
       });
-    } catch (err) {
-      setError('Erro ao carregar categoria');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Erro ao carregar categoria');
     } finally {
       setLoading(false);
     }
@@ -49,6 +51,11 @@ export default function CategoryForm() {
 
     if (!currentStoreId) {
       setError('Selecione uma loja antes de salvar.');
+      return;
+    }
+
+    if (!formData.name.trim()) {
+      setError('O nome da categoria é obrigatório.');
       return;
     }
 
@@ -76,6 +83,7 @@ export default function CategoryForm() {
 
       navigate('/admin/categories');
     } catch (err: any) {
+      console.error('Erro ao salvar categoria:', err);
       setError(err.response?.data?.detail || 'Erro ao salvar categoria');
     } finally {
       setSaving(false);
@@ -83,12 +91,19 @@ export default function CategoryForm() {
   };
 
   if (!currentStoreId) {
-    return <div className="p-6 text-center">Selecione uma loja para continuar</div>;
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center p-6">
+          <h2 className="text-xl font-semibold text-slate-800 mb-2">Selecione uma loja</h2>
+          <p className="text-slate-600">Escolha uma loja para criar ou editar categorias</p>
+        </div>
+      </div>
+    );
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-slate-600">Carregando...</p>
@@ -131,55 +146,81 @@ export default function CategoryForm() {
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8">
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Nome *</label>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Nome da Categoria *
+              </label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-red-500"
+                className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-red-500 focus:ring-0"
+                placeholder="Ex: Lanches, Bebidas, Sobremesas..."
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Descrição</label>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Descrição
+              </label>
               <textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg"
+                className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-red-500 focus:ring-0"
                 rows={3}
+                placeholder="Descreva brevemente esta categoria..."
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">URL da Imagem</label>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                URL da Imagem
+              </label>
               <input
                 type="url"
                 value={formData.image_url}
                 onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg"
+                className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-red-500 focus:ring-0"
+                placeholder="https://exemplo.com/imagem.jpg"
               />
+              {formData.image_url && (
+                <div className="mt-2">
+                  <img
+                    src={formData.image_url}
+                    alt="Preview"
+                    className="h-32 object-cover rounded-lg border"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Ordem</label>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Ordem de Exibição
+              </label>
               <input
                 type="number"
                 value={formData.sort_order}
                 onChange={(e) =>
                   setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })
                 }
-                className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg"
+                className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-red-500 focus:ring-0"
                 min="0"
               />
+              <p className="text-sm text-slate-500 mt-1">
+                Categorias com menor número aparecem primeiro
+              </p>
             </div>
           </div>
 
-          <div className="flex gap-4 mt-8 pt-6 border-t">
+          <div className="flex gap-4 mt-8 pt-6 border-t border-slate-200">
             <button
               type="button"
               onClick={() => navigate('/admin/categories')}
-              className="flex-1 px-6 py-3 border-2 border-slate-200 rounded-lg"
+              className="flex-1 px-6 py-3 border-2 border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
             >
               Cancelar
             </button>
@@ -187,9 +228,10 @@ export default function CategoryForm() {
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg"
+              className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {saving ? 'Salvando...' : 'Salvar'}
+              <Save className="w-5 h-5" />
+              {saving ? 'Salvando...' : (isEditing ? 'Atualizar' : 'Criar Categoria')}
             </button>
           </div>
         </form>

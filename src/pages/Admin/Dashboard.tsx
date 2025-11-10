@@ -1,3 +1,4 @@
+// Dashboard.tsx - VERSÃO CORRIGIDA
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, LayoutDashboard, Package, FolderTree, Users } from 'lucide-react';
@@ -44,22 +45,23 @@ export default function Dashboard() {
             </button>
           </div>
         </div>
-      </header >
+      </header>
 
       {/* Content */}
-      < main className="max-w-7xl mx-auto px-4 py-8" >
+      <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Cards de Boas-vindas */}
-        < div className="bg-gradient-to-br from-red-600 to-orange-500 rounded-2xl p-8 text-white mb-8" >
+        <div className="bg-gradient-to-br from-red-600 to-orange-500 rounded-2xl p-8 text-white mb-8">
           <h2 className="text-3xl font-bold mb-2">
             Olá, {user?.full_name?.split(' ')[0] || 'Usuário'}! 👋
           </h2>
           <p className="text-white/90 text-lg">
             Seja bem-vindo ao painel administrativo do ClickFome
           </p>
-        </div >
+        </div>
 
-        {/* Menu Cards */}
-        < div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6" >
+        {/* Menu Cards - CORRIGIDO: APENAS 4 CARDS NO GRID */}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Dashboard */}
           <div className="bg-white p-6 rounded-xl border-2 border-slate-200 hover:border-red-500 hover:shadow-lg transition-all cursor-pointer group">
             <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
               <LayoutDashboard className="w-6 h-6 text-blue-600" />
@@ -68,15 +70,23 @@ export default function Dashboard() {
             <p className="text-sm text-slate-600">Visão geral do negócio</p>
           </div>
 
-          <div className="bg-white p-6 rounded-xl border-2 border-slate-200 hover:border-red-500 hover:shadow-lg transition-all cursor-pointer group">
+          {/* Produtos - AGORA É UM LINK FUNCIONAL */}
+          <Link
+            to="/admin/products"
+            className="bg-white p-6 rounded-xl border-2 border-slate-200 hover:border-red-500 hover:shadow-lg transition-all cursor-pointer group block"
+          >
             <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
               <Package className="w-6 h-6 text-green-600" />
             </div>
             <h3 className="font-bold text-slate-900 mb-1">Produtos</h3>
             <p className="text-sm text-slate-600">Gerenciar cardápio</p>
-          </div>
+          </Link>
 
-          <Link to="/admin/categories" className="bg-white p-6 rounded-xl border-2 border-slate-200 hover:border-red-500 hover:shadow-lg transition-all cursor-pointer group block">
+          {/* Categorias */}
+          <Link
+            to="/admin/categories"
+            className="bg-white p-6 rounded-xl border-2 border-slate-200 hover:border-red-500 hover:shadow-lg transition-all cursor-pointer group block"
+          >
             <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
               <FolderTree className="w-6 h-6 text-purple-600" />
             </div>
@@ -84,6 +94,7 @@ export default function Dashboard() {
             <p className="text-sm text-slate-600">Organizar produtos</p>
           </Link>
 
+          {/* Usuários */}
           <div className="bg-white p-6 rounded-xl border-2 border-slate-200 hover:border-red-500 hover:shadow-lg transition-all cursor-pointer group">
             <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
               <Users className="w-6 h-6 text-orange-600" />
@@ -91,18 +102,10 @@ export default function Dashboard() {
             <h3 className="font-bold text-slate-900 mb-1">Usuários</h3>
             <p className="text-sm text-slate-600">Gerenciar equipe</p>
           </div>
-        </div >
-        
-        <Link to="/admin/products" className="bg-white p-6 rounded-xl border-2 border-slate-200 hover:border-red-500 hover:shadow-lg transition-all cursor-pointer group block">
-          <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-            <Package className="w-6 h-6 text-green-600" />
-          </div>
-          <h3 className="font-bold text-slate-900 mb-1">Produtos</h3>
-          <p className="text-sm text-slate-600">Gerenciar cardápio</p>
-        </Link>
+        </div>
 
         {/* Info do Usuário */}
-        < div className="mt-8 bg-white rounded-xl border border-slate-200 p-6" >
+        <div className="mt-8 bg-white rounded-xl border border-slate-200 p-6">
           <h3 className="text-lg font-bold text-slate-900 mb-4">Informações da Conta</h3>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
@@ -125,8 +128,8 @@ export default function Dashboard() {
               </span>
             </div>
           </div>
-        </div >
-      </main >
-    </div >
+        </div>
+      </main>
+    </div>
   );
 }
