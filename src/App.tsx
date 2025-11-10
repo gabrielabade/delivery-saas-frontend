@@ -11,6 +11,9 @@ import CategoryForm from './pages/Admin/Categories/CategoryForm';
 // Importações dos produtos
 import ProductList from './pages/Admin/Products/ProductList';
 import ProductForm from './pages/Admin/Products/ProductForm';
+// Importações dos usuários
+import UserList from './pages/Admin/Users/UserList';
+import UserForm from './pages/Admin/Users/UserForm';
 
 function App() {
   return (
@@ -83,6 +86,35 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
+            {/* Usuários */}
+            <Route
+              path="/admin/users"
+              element={
+                <ProtectedRoute allowedRoles={['PLATFORM_ADMIN', 'COMPANY_ADMIN']}>
+                  <UserList />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/admin/users/new"
+              element={
+                <ProtectedRoute allowedRoles={['PLATFORM_ADMIN', 'COMPANY_ADMIN']}>
+                  <UserForm />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/admin/users/edit/:id"
+              element={
+                <ProtectedRoute allowedRoles={['PLATFORM_ADMIN', 'COMPANY_ADMIN']}>
+                  <UserForm />
+                </ProtectedRoute>
+              }
+            />
+
 
             {/* Redirect padrão */}
             <Route path="*" element={<Navigate to="/" replace />} />

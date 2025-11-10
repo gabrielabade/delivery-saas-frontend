@@ -1,3 +1,17 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.Toastify__toast--success {
+  background: linear-gradient(to right, #dc2626, #f97316); /* vermelho -> laranja */
+  color: #fff;
+}
+
+.Toastify__toast--error {
+  background: #dc2626;
+  color: #fff;
+}
+
+.Toastify__progress-bar {
+  background: #fff;
+}

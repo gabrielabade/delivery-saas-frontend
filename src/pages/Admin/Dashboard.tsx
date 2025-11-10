@@ -59,7 +59,7 @@ export default function Dashboard() {
           </p>
         </div>
 
-        {/* Menu Cards - CORRIGIDO: APENAS 4 CARDS NO GRID */}
+        {/* Menu Cards */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Dashboard */}
           <div className="bg-white p-6 rounded-xl border-2 border-slate-200 hover:border-red-500 hover:shadow-lg transition-all cursor-pointer group">
@@ -70,7 +70,7 @@ export default function Dashboard() {
             <p className="text-sm text-slate-600">Visão geral do negócio</p>
           </div>
 
-          {/* Produtos - AGORA É UM LINK FUNCIONAL */}
+          {/* Produtos */}
           <Link
             to="/admin/products"
             className="bg-white p-6 rounded-xl border-2 border-slate-200 hover:border-red-500 hover:shadow-lg transition-all cursor-pointer group block"
@@ -95,14 +95,18 @@ export default function Dashboard() {
           </Link>
 
           {/* Usuários */}
-          <div className="bg-white p-6 rounded-xl border-2 border-slate-200 hover:border-red-500 hover:shadow-lg transition-all cursor-pointer group">
+          <Link
+            to="/admin/users"
+            className="bg-white p-6 rounded-xl border-2 border-slate-200 hover:border-red-500 hover:shadow-lg transition-all cursor-pointer group block"
+          >
             <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
               <Users className="w-6 h-6 text-orange-600" />
             </div>
             <h3 className="font-bold text-slate-900 mb-1">Usuários</h3>
             <p className="text-sm text-slate-600">Gerenciar equipe</p>
-          </div>
+          </Link>
         </div>
+
 
         {/* Info do Usuário */}
         <div className="mt-8 bg-white rounded-xl border border-slate-200 p-6">
