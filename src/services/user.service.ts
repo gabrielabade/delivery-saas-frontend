@@ -1,5 +1,4 @@
-// src/services/user.service.ts
-import api from './api';
+import api from "./api";
 
 export interface User {
   id: number;
@@ -9,13 +8,14 @@ export interface User {
   role: 'PLATFORM_ADMIN' | 'COMPANY_ADMIN' | 'STORE_MANAGER' | 'DELIVERY_PERSON' | 'CUSTOMER';
   is_active: boolean;
   store_id?: number | null;
+  company_id?: number | null; 
 }
 
 export interface UserCreate {
   email: string;
   full_name: string;
   phone?: string;
-  role: User['role'];
+  role: string;
   password: string;
   store_id?: number | null;
 }
@@ -24,42 +24,44 @@ export interface UserUpdate {
   email?: string;
   full_name?: string;
   phone?: string;
-  role?: User['role'];
+  role?: string;
   password?: string;
   store_id?: number | null;
 }
 
-const userService = {
-  async list(filters?: { search?: string; role?: string }) {
-    const params: any = {};
-    if (filters?.search) params.search = filters.search;
-    if (filters?.role) params.role = filters.role;
+export interface UserListParams {
+  search?: string;
+  role?: string;
+  store_id?: number | null;
+}
 
-    const { data } = await api.get('/users/', { params });
-    return data;
+const userService = {
+  async list(params?: UserListParams): Promise<{ users: User[] }> {
+    const res = await api.get("/users/", { params });
+    return res.data;
   },
 
   async getById(id: number): Promise<User> {
-    const { data } = await api.get(`/users/${id}`);
-    return data;
+    const res = await api.get(`/users/${id}`);
+    return res.data;
   },
 
-  async create(payload: UserCreate): Promise<User> {
-    const { data } = await api.post('/users/', payload);
-    return data;
+  async create(data: UserCreate): Promise<User> {
+    const res = await api.post("/users/", data);
+    return res.data;
   },
 
-  async update(id: number, payload: UserUpdate): Promise<User> {
-    const { data } = await api.put(`/users/${id}`, payload);
-    return data;
+  async update(id: number, data: UserUpdate): Promise<User> {
+    const res = await api.put(`/users/${id}`, data);
+    return res.data;
   },
 
-  async deactivate(id: number): Promise<void> {
-    await api.patch(`/users/${id}/deactivate`);
+  async deactivate(id: number) {
+    await api.post(`/users/${id}/deactivate`);
   },
 
-  async activate(id: number): Promise<void> {
-    await api.patch(`/users/${id}/activate`);
+  async activate(id: number) {
+    await api.post(`/users/${id}/activate`);
   },
 };
 

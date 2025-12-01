@@ -22,11 +22,11 @@ export interface LoginResponse {
 
 class AuthService {
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
-    // Endpoint espera form-data (application/x-www-form-urlencoded)
     const formData = new URLSearchParams();
     formData.append('username', credentials.username);
     formData.append('password', credentials.password);
 
+    // ⚠️ IMPORTANTE: Use caminho RELATIVO (sem /api no início)
     const response = await api.post<LoginResponse>('/auth/login', formData, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -35,12 +35,14 @@ class AuthService {
 
     if (response.data.access_token) {
       localStorage.setItem('token', response.data.access_token);
+      api.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
     }
 
     return response.data;
   }
 
   async getCurrentUser(): Promise<User> {
+    // ⚠️ IMPORTANTE: Use caminho RELATIVO
     const response = await api.get<User>('/auth/me');
     localStorage.setItem('user', JSON.stringify(response.data));
     return response.data;
@@ -49,6 +51,7 @@ class AuthService {
   logout(): void {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    delete api.defaults.headers.common['Authorization'];
   }
 
   getStoredUser(): User | null {

@@ -1,36 +1,56 @@
-import axios from 'axios';
+import axios from "axios";
+import type { InternalAxiosRequestConfig, AxiosResponse } from "axios";
+
+/**
+ * Configuração da API
+ * Em desenvolvimento: http://localhost:3000/api (proxy do Vite)
+ * Em produção: https://folkz.website (direto)
+ */
+const isDevelopment = import.meta.env.VITE_NODE_ENV === 'development';
+const baseURL = import.meta.env.VITE_API_URL ||
+  (isDevelopment ? 'http://localhost:3000/api' : 'https://folkz.website');
+
+console.log('🔧 API Config:', { baseURL, isDevelopment });
 
 const api = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
+  timeout: 30000,
 });
 
-// Interceptor para adicionar token em todas as requisições
+// Interceptor de request
 api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
+  (config: InternalAxiosRequestConfig) => {
+    const token = localStorage.getItem("token");
     if (token) {
+      config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Interceptor para tratar erros globalmente
+// Interceptor de response
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Token inválido ou expirado
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+  (response: AxiosResponse) => response,
+  (error: any) => {
+    console.error("❌ Erro API:", {
+      url: error.config?.url,
+      status: error.response?.status,
+      message: error.message
+    });
+
+    if (error?.response?.status === 401) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = "/login";
+      }
     }
+
     return Promise.reject(error);
   }
 );

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../contexts/StoreContext';
-import { useAuth } from '../contexts/AuthContext';
+// REMOVA: import { useAuth } from '../contexts/AuthContext'; // Não está sendo usado
 import api from '../services/api';
 import { Store, ChevronDown, Check } from 'lucide-react';
 

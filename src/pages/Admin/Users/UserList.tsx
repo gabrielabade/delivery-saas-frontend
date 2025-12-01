@@ -1,24 +1,29 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, PlusCircle, Edit3, Trash2, RefreshCw } from 'lucide-react';
-import userService, { User } from '../../../services/user.service';
-import { toast } from 'react-toastify';
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Search, PlusCircle, Edit3, Trash2, RefreshCw } from "lucide-react";
+import userService, { User } from "../../../services/user.service";
+import { useAuth } from "../../../contexts/AuthContext";
+import { useStore } from "../../../contexts/StoreContext";
+import AdminLayout from "../../../components/Layout/AdminLayout"; // ADICIONE
 
 export default function UserList() {
   const [users, setUsers] = useState<User[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [role, setRole] = useState('');
+  const [search, setSearch] = useState("");
+  const [role, setRole] = useState("");
   const navigate = useNavigate();
+
+  const { user: currentUser } = useAuth(); // Renomeei para currentUser para evitar confusão
+  const { currentStoreId, currentStore } = useStore(); // ADICIONE currentStore
 
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const data = await userService.list({ search, role });
-      setUsers(data.users || data); // aceita backend que retorna {users:[]} ou []
+      const data = await userService.list();
+      setUsers(data.users || []);
     } catch (error) {
-      console.error('Erro ao carregar usuários:', error);
-      toast.error('Erro ao carregar usuários');
+      console.error("Erro ao carregar usuários:", error);
     } finally {
       setLoading(false);
     }
@@ -28,77 +33,116 @@ export default function UserList() {
     loadUsers();
   }, []);
 
+  useEffect(() => {
+    let filtered = [...users];
+
+    if (search) {
+      filtered = filtered.filter((u) =>
+        u.full_name?.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+
+    if (role) {
+      filtered = filtered.filter((u) => u.role === role);
+    }
+
+    // REMOVA estas linhas se não existir company_id no User:
+    // if (user?.role === "COMPANY_ADMIN" && user.company_id) {
+    //   filtered = filtered.filter((u) => u.company_id === user.company_id);
+    // }
+
+    if (currentUser?.role === "STORE_MANAGER" && currentStoreId) {
+      filtered = filtered.filter((u) => u.store_id === currentStoreId);
+    }
+
+    setFilteredUsers(filtered);
+  }, [users, search, role, currentUser, currentStoreId]);
+
   const handleDeactivate = async (id: number) => {
-    if (!confirm('Deseja desativar este usuário?')) return;
+    if (!confirm("Deseja desativar este usuário?")) return;
     await userService.deactivate(id);
-    toast.info('Usuário desativado');
     await loadUsers();
   };
 
   const handleActivate = async (id: number) => {
-    if (!confirm('Deseja reativar este usuário?')) return;
+    if (!confirm("Deseja reativar este usuário?")) return;
     await userService.activate(id);
-    toast.success('Usuário reativado');
     await loadUsers();
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-slate-900">Usuários</h1>
-          <button
-            onClick={() => navigate('/admin/users/new')}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-orange-500 text-white rounded-lg hover:scale-105 transition-all"
-          >
-            <PlusCircle className="w-4 h-4" />
-            Novo Usuário
-          </button>
+    <AdminLayout
+      title="Usuários"
+      subtitle={currentStore ? `Loja: ${currentStore.name}` : 'Todas as lojas'}
+      showBackButton={true}
+    >
+      {/* Cabeçalho da página */}
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">Gerenciar Usuários</h2>
+          <p className="text-slate-600 mt-1">
+            {currentStoreId
+              ? `Usuários da loja: ${filteredUsers.length}`
+              : `Total de usuários: ${filteredUsers.length}`}
+          </p>
         </div>
-      </header>
-
-      {/* Filtros */}
-      <div className="max-w-6xl mx-auto px-4 py-6 flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-3.5 w-5 h-5 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Buscar usuário..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:border-red-500 outline-none"
-          />
-        </div>
-
-        <select
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-          className="px-4 py-2 border border-slate-300 rounded-lg focus:border-red-500 outline-none"
-        >
-          <option value="">Todos os papéis</option>
-          <option value="PLATFORM_ADMIN">Platform Admin</option>
-          <option value="COMPANY_ADMIN">Company Admin</option>
-          <option value="STORE_MANAGER">Store Manager</option>
-          <option value="DELIVERY_PERSON">Delivery</option>
-          <option value="CUSTOMER">Customer</option>
-        </select>
 
         <button
-          onClick={loadUsers}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-200 rounded-lg hover:bg-slate-300 transition-colors"
+          onClick={() => navigate("/admin/users/new")}
+          className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-red-600 to-orange-500 text-white rounded-lg hover:scale-105 transition-all"
         >
-          <RefreshCw className="w-4 h-4" />
-          Atualizar
+          <PlusCircle className="w-4 h-4" />
+          Novo Usuário
         </button>
       </div>
 
+      {/* Filtros */}
+      <div className="bg-white p-4 rounded-xl border border-slate-200 mb-6">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-3.5 w-5 h-5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Buscar usuário..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:border-red-500 outline-none"
+            />
+          </div>
+
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            className="px-4 py-2 border border-slate-300 rounded-lg focus:border-red-500 outline-none"
+          >
+            <option value="">Todos os papéis</option>
+            <option value="PLATFORM_ADMIN">Platform Admin</option>
+            <option value="COMPANY_ADMIN">Company Admin</option>
+            <option value="STORE_MANAGER">Store Manager</option>
+            <option value="DELIVERY_PERSON">Delivery</option>
+            <option value="CUSTOMER">Customer</option>
+          </select>
+
+          <button
+            onClick={loadUsers}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-200 rounded-lg hover:bg-slate-300 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Atualizar
+          </button>
+        </div>
+      </div>
+
       {/* Lista */}
-      <div className="max-w-6xl mx-auto px-4">
+      <div className="max-w-6xl mx-auto">
         {loading ? (
-          <div className="text-center py-16 text-slate-500">Carregando usuários...</div>
-        ) : users.length === 0 ? (
-          <div className="text-center py-16 text-slate-500">Nenhum usuário encontrado</div>
+          <div className="text-center py-16 text-slate-500">
+            Carregando usuários...
+          </div>
+        ) : filteredUsers.length === 0 ? (
+          <div className="text-center py-16 text-slate-500">
+            Nenhum usuário encontrado
+          </div>
         ) : (
           <div className="bg-white rounded-2xl border border-slate-200 overflow-x-auto">
             <table className="min-w-full text-sm">
@@ -107,16 +151,18 @@ export default function UserList() {
                   <th className="py-3 px-4 text-left">Nome</th>
                   <th className="py-3 px-4 text-left">Email</th>
                   <th className="py-3 px-4 text-left">Função</th>
+                  <th className="py-3 px-4 text-left">Loja</th>
                   <th className="py-3 px-4 text-center">Status</th>
                   <th className="py-3 px-4 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
-                {users.map((user) => (
-                  <tr key={user.id} className="border-t border-slate-200 hover:bg-slate-50">
-                    <td className="py-3 px-4">{user.full_name || '-'}</td>
-                    <td className="py-3 px-4">{user.email || '-'}</td>
+                {filteredUsers.map((user) => (
+                  <tr key={user.id} className="border-t hover:bg-slate-50">
+                    <td className="py-3 px-4">{user.full_name || "-"}</td>
+                    <td className="py-3 px-4">{user.email}</td>
                     <td className="py-3 px-4">{user.role}</td>
+                    <td className="py-3 px-4">{user.store_id || "-"}</td>
                     <td className="py-3 px-4 text-center">
                       {user.is_active ? (
                         <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">
@@ -158,6 +204,6 @@ export default function UserList() {
           </div>
         )}
       </div>
-    </div>
+    </AdminLayout>
   );
 }
