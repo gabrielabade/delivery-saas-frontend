@@ -1,283 +1,321 @@
-import AdminLayout from '../../../components/Layout/AdminLayout';
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Edit, Trash2, RefreshCw } from 'lucide-react';
-import categoryService, { Category } from '../../../services/category.service';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  FolderTree,
+  Plus,
+  Search,
+  Edit2,
+  Trash2,
+  Check,
+  X
+} from 'lucide-react';
+import api from '../../../services/api';
 import { useStore } from '../../../contexts/StoreContext';
 
+interface Category {
+  id: number;
+  name: string;
+  description?: string;
+  image_url?: string;
+  sort_order: number;
+  is_active: boolean;
+  store_id: number;
+}
 
-export default function CategoryList() {
-  const navigate = useNavigate();
-  const { currentStoreId, currentStore } = useStore(); // Corrigido: adicionar currentStore
-
+const CategoryList = () => {
+  const { currentStore } = useStore();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>('');
-  const [deleteId, setDeleteId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    if (currentStoreId) {
-      console.log('🔄 Store ID mudou, carregando categorias...', currentStoreId);
-      loadCategories();
-    } else {
-      setCategories([]);
-      setLoading(false);
+    if (currentStore) {
+      fetchCategories();
     }
-  }, [currentStoreId]);
+  }, [currentStore]);
 
-  const loadCategories = async () => {
-    if (!currentStoreId) {
-      console.log('❌ Nenhuma store selecionada');
+  const fetchCategories = async () => {
+    if (!currentStore) {
+      console.error('Nenhuma loja selecionada');
       setLoading(false);
       return;
     }
 
     try {
       setLoading(true);
-      setError('');
-      console.log('📡 Carregando categorias para store:', currentStoreId);
+      console.log('Buscando categorias para loja:', currentStore.id);
 
-      const data = await categoryService.list(currentStoreId);
-      console.log('✅ Categorias carregadas:', data);
+      // TENTE ESTAS ROTAS EM ORDEM:
+      let categoriesData = [];
 
-      setCategories(data);
-    } catch (err: any) {
-      console.error('❌ Erro ao carregar categorias:', err);
+      try {
+        // Primeira tentativa: rota específica por store
+        const response = await api.get(`/categories/store/${currentStore.id}`);
+        categoriesData = response.data || [];
+        console.log('Categorias encontradas (rota store):', categoriesData.length);
+      } catch (error1: any) {
+        console.log('Rota /categories/store não funcionou, tentando produtos/categories...');
 
-      const errorMessage = err.response?.data?.detail
-        ? String(err.response.data.detail)
-        : 'Erro ao carregar categorias';
+        try {
+          // Segunda tentativa: rota de produtos/categories
+          const response = await api.get('/products/categories/admin', {
+            params: { store_id: currentStore.id }
+          });
+          categoriesData = response.data || [];
+          console.log('Categorias encontradas (rota products):', categoriesData.length);
+        } catch (error2: any) {
+          console.log('Rota /products/categories não funcionou, tentando /categories...');
 
-      setError(errorMessage);
+          try {
+            // Terceira tentativa: rota geral de categories
+            const response = await api.get('/categories/');
+            categoriesData = (response.data || []).filter((cat: Category) =>
+              cat.store_id === currentStore.id
+            );
+            console.log('Categorias filtradas:', categoriesData.length);
+          } catch (error3: any) {
+            console.error('Todas as rotas falharam:', error3);
+          }
+        }
+      }
+
+      setCategories(categoriesData);
+
+    } catch (error: any) {
+      console.error('Erro ao buscar categorias:', error);
+      alert(`Erro ao buscar categorias: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const filteredCategories = categories.filter(category =>
+    category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (category.description && category.description.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  const handleToggleActive = async (categoryId: number, isActive: boolean) => {
+    if (!currentStore) return;
+
     try {
-      await categoryService.delete(id, currentStoreId!);
-      setCategories((prev) => prev.filter((c) => c.id !== id));
-      setDeleteId(null);
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.detail
-        ? String(err.response.data.detail)
-        : 'Erro ao deletar categoria';
-      alert(errorMessage);
+      // Primeiro tenta a rota específica
+      try {
+        await api.patch(`/categories/${categoryId}/toggle-active`);
+      } catch (error1: any) {
+        // Se não funcionar, tenta atualizar diretamente
+        await api.put(`/categories/${categoryId}`, {
+          is_active: !isActive
+        });
+      }
+
+      fetchCategories(); // Recarrega a lista
+    } catch (error: any) {
+      console.error('Erro ao alterar status:', error);
+      alert(`Erro: ${error.message}`);
     }
   };
 
-  const filtered = categories.filter((cat) =>
-    cat.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cat.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleDelete = async (categoryId: number) => {
+    if (!window.confirm('Tem certeza que deseja excluir esta categoria?')) return;
 
-  // Caso 1: Nenhuma loja selecionada
-  if (!currentStoreId) {
-    return (
-      <AdminLayout
-        title="Categorias"
-        subtitle="Selecione uma loja"
-        showBackButton={true}
-      >
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="text-center p-6">
-            <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl">🏪</span>
-            </div>
-            <h2 className="text-xl font-semibold text-slate-800 mb-2">Selecione uma loja</h2>
-            <p className="text-slate-600">Escolha uma loja no seletor acima para ver as categorias</p>
-          </div>
-        </div>
-      </AdminLayout>
-    );
-  }
+    try {
+      await api.delete(`/categories/${categoryId}`);
+      fetchCategories();
+    } catch (error: any) {
+      console.error('Erro ao excluir categoria:', error);
+      alert(`Erro: ${error.message}`);
+    }
+  };
 
-  // Caso 2: Carregando
   if (loading) {
     return (
-      <AdminLayout
-        title="Categorias"
-        subtitle={currentStore ? `Loja: ${currentStore.name}` : 'Carregando...'}
-        showBackButton={true}
-      >
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="text-center">
-            <div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-slate-600">Carregando categorias...</p>
-          </div>
-        </div>
-      </AdminLayout>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
+      </div>
     );
   }
 
-  // Caso 3: Conteúdo principal
   return (
-    <AdminLayout
-      title="Categorias"
-      subtitle={currentStore ? `Loja: ${currentStore.name}` : `ID: ${currentStoreId}`}
-      showBackButton={true}
-    >
-      {/* Cabeçalho da página */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Gerenciar Categorias</h2>
-          <p className="text-slate-600 mt-1">
-            {categories.length === 0
-              ? 'Nenhuma categoria cadastrada'
-              : `Total de categorias: ${categories.length}`}
-          </p>
-        </div>
-
-        <div className="flex gap-3">
-          <button
-            onClick={loadCategories}
-            disabled={loading}
-            className="flex items-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-          >
-            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-            Recarregar
-          </button>
-
-          <Link
-            to="/admin/categories/new"
-            className="flex items-center gap-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-          >
-            <Plus size={18} />
-            Nova Categoria
-          </Link>
-        </div>
-      </div>
-
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <div className="flex items-start gap-3">
-            <div className="flex-1">
-              <h4 className="font-medium text-red-800 mb-1">Erro ao carregar categorias</h4>
-              <p className="text-red-700 text-sm">{error}</p>
+    <div className="min-h-screen bg-slate-50">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-red-600 to-orange-500 border-b-4 border-orange-600">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h1 className="text-3xl font-black text-white mb-2">Categorias</h1>
+              <p className="text-orange-100">
+                {currentStore ? `Loja: ${currentStore.name}` : 'Selecione uma loja'}
+              </p>
             </div>
-            <button
-              onClick={() => setError('')}
-              className="text-red-600 hover:text-red-800"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
 
-      {/* Barra de Busca */}
-      <div className="mb-6">
-        <input
-          type="text"
-          placeholder="Buscar categorias por nome ou descrição..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg focus:border-red-500"
-        />
-      </div>
-
-      {/* Grid de Categorias */}
-      {filtered.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-2xl border border-slate-200">
-          <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-2xl">📁</span>
-          </div>
-          <h3 className="text-lg font-medium text-slate-900 mb-2">
-            {searchTerm ? 'Nenhuma categoria encontrada' : 'Nenhuma categoria cadastrada'}
-          </h3>
-          <p className="text-slate-500 mb-6">
-            {searchTerm
-              ? 'Tente ajustar os termos da busca'
-              : 'Comece criando sua primeira categoria'
-            }
-          </p>
-          {!searchTerm && (
             <Link
               to="/admin/categories/new"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              className="flex items-center gap-2 px-6 py-3 bg-white text-orange-600 rounded-xl font-bold hover:bg-orange-50 transition-colors"
             >
-              <Plus size={18} />
-              Criar Primeira Categoria
+              <Plus size={20} />
+              Nova Categoria
             </Link>
-          )}
+          </div>
         </div>
-      ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((cat) => (
-            <div key={cat.id} className="bg-white rounded-2xl border border-slate-200 p-6 hover:shadow-lg transition-shadow">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="font-bold text-slate-900 text-lg">{cat.name}</h3>
-                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">
-                  Ordem: {cat.sort_order}
-                </span>
-              </div>
+      </div>
 
-              {cat.description && (
-                <p className="text-slate-600 text-sm mb-4 line-clamp-2">{cat.description}</p>
-              )}
-
-              {cat.image_url && (
-                <div className="mb-4">
-                  <img
-                    src={cat.image_url}
-                    alt={cat.name}
-                    className="w-full h-32 object-cover rounded-lg"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                <Link
-                  to={`/admin/categories/edit/${cat.id}`}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <Edit size={16} />
-                  Editar
-                </Link>
-
-                <button
-                  onClick={() => setDeleteId(cat.id)}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  <Trash2 size={16} />
-                  Excluir
-                </button>
-              </div>
+      {/* Conteúdo */}
+      <div className="container mx-auto px-4 py-8">
+        {/* Barra de busca e info */}
+        <div className="mb-8">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+            <div>
+              <h2 className="text-lg font-bold text-slate-800">Gerenciar Categorias</h2>
+              <p className="text-slate-600">
+                Total de categorias: <span className="font-bold text-orange-600">{categories.length}</span>
+              </p>
             </div>
-          ))}
-        </div>
-      )}
 
-      {/* Modal de Confirmação de Exclusão */}
-      {deleteId && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">Confirmar exclusão</h3>
-            <p className="text-slate-600 mb-6">
-              Tem certeza que deseja excluir esta categoria? Esta ação não pode ser desfeita.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setDeleteId(null)}
-                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => handleDelete(deleteId)}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-              >
-                Excluir
-              </button>
+            <div className="relative w-full md:w-auto">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
+              <input
+                type="text"
+                placeholder="Buscar categorias por nome ou descrição..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full md:w-96 pl-10 pr-4 py-3 border-2 border-slate-200 rounded-xl focus:border-orange-500 focus:ring-0 focus:outline-none transition-colors"
+              />
             </div>
           </div>
         </div>
-      )}
-    </AdminLayout>
+
+        {!currentStore ? (
+          <div className="text-center py-12">
+            <div className="mx-auto w-24 h-24 bg-orange-100 rounded-full flex items-center justify-center mb-4">
+              <FolderTree size={40} className="text-orange-500" />
+            </div>
+            <h3 className="text-lg font-medium text-slate-900 mb-2">
+              Selecione uma loja primeiro
+            </h3>
+            <p className="text-slate-500 mb-6">
+              Use o seletor de lojas no cabeçalho para escolher qual loja gerenciar
+            </p>
+          </div>
+        ) : filteredCategories.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="mx-auto w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+              <FolderTree size={40} className="text-slate-400" />
+            </div>
+            <h3 className="text-lg font-medium text-slate-900 mb-2">
+              Nenhuma categoria encontrada
+            </h3>
+            <p className="text-slate-500 mb-6">
+              {searchTerm
+                ? 'Tente buscar com outros termos'
+                : `Esta loja ainda não tem categorias cadastradas`
+              }
+            </p>
+            {!searchTerm && (
+              <Link
+                to="/admin/categories/new"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-red-600 to-orange-500 text-white rounded-xl font-bold hover:shadow-xl transition-all"
+              >
+                <Plus size={20} />
+                Criar Primeira Categoria
+              </Link>
+            )}
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl border-2 border-slate-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y-2 divide-slate-100">
+                <thead className="bg-gradient-to-r from-slate-50 to-orange-50">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Categoria
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Descrição
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Ordem
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Ações
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredCategories.map((category) => (
+                    <tr key={category.id} className="hover:bg-orange-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center">
+                          <div className="p-2 bg-orange-100 rounded-lg mr-3">
+                            <FolderTree size={20} className="text-orange-600" />
+                          </div>
+                          <div>
+                            <div className="font-bold text-slate-900">{category.name}</div>
+                            <div className="text-xs text-slate-500">ID: {category.id}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-slate-900 max-w-xs">
+                          {category.description || '—'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm font-medium">
+                          {category.sort_order}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() => handleToggleActive(category.id, category.is_active)}
+                          className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 ${category.is_active
+                              ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                              : 'bg-red-100 text-red-700 hover:bg-red-200'
+                            }`}
+                        >
+                          {category.is_active ? (
+                            <>
+                              <Check size={12} />
+                              Ativa
+                            </>
+                          ) : (
+                            <>
+                              <X size={12} />
+                              Inativa
+                            </>
+                          )}
+                        </button>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex gap-2">
+                          <Link
+                            to={`/admin/categories/edit/${category.id}`}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Editar"
+                          >
+                            <Edit2 size={18} />
+                          </Link>
+                          <button
+                            onClick={() => handleDelete(category.id)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Excluir"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
-}
+};
+
+export default CategoryList;

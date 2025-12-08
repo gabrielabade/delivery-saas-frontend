@@ -1,87 +1,132 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import api from '../services/api';
 import { useAuth } from './AuthContext';
 
 interface Store {
   id: number;
   name: string;
-  subdomain: string;
+  slug: string;
+  email: string;
+  phone?: string;
+  is_active: boolean;
+  created_at: string;
 }
 
 interface StoreContextData {
-  currentStoreId: number | null;
+  stores: Store[];
   currentStore: Store | null;
-  setCurrentStoreId: (storeId: number) => void;
+  currentStoreId: number | null;
   setCurrentStore: (store: Store | null) => void;
+  setCurrentStoreId: (id: number | null) => void;
   canManageMultipleStores: boolean;
+  loading: boolean;
+  refreshStores: () => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextData>({} as StoreContextData);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
+  const [stores, setStores] = useState<Store[]>([]);
+  const [currentStore, setCurrentStoreState] = useState<Store | null>(null);
+  const [loading, setLoading] = useState(true);
   const { user } = useAuth();
-  const [currentStoreId, setCurrentStoreIdState] = useState<number | null>(null);
-  const [currentStore, setCurrentStore] = useState<Store | null>(null);
 
-  const canManageMultipleStores =
-    user?.role === 'PLATFORM_ADMIN' || user?.role === 'COMPANY_ADMIN';
+  // Verificar se usuário pode gerenciar múltiplas lojas
+  const canManageMultipleStores = user?.role === 'PLATFORM_ADMIN' || user?.role === 'COMPANY_ADMIN';
 
   useEffect(() => {
-    if (!user) {
-      setCurrentStoreIdState(null);
-      setCurrentStore(null);
-      localStorage.removeItem('current_store_id');
-      return;
-    }
+    loadStores();
+  }, [user]);
 
-    if (!canManageMultipleStores) {
-      if (user.store_id) {
-        setCurrentStoreIdState(user.store_id);
-        setCurrentStore({
-          id: user.store_id,
-          name: `Loja ${user.store_id}`,
-          subdomain: `loja-${user.store_id}`,
-        });
+  const loadStores = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/stores/');
+      const storesData = response.data;
+
+      setStores(storesData);
+
+      // Se o usuário tem uma store associada no perfil, usa ela
+      if (user?.store_id) {
+        const userStore = storesData.find((store: Store) => store.id === user.store_id);
+        if (userStore) {
+          setCurrentStoreState(userStore);
+          localStorage.setItem('currentStoreId', userStore.id.toString());
+          return;
+        }
       }
-      return;
+
+      // Tentar recuperar do localStorage
+      const storedStoreId = localStorage.getItem('currentStoreId');
+      if (storedStoreId) {
+        const storedStore = storesData.find((store: Store) => store.id === parseInt(storedStoreId));
+        if (storedStore) {
+          setCurrentStoreState(storedStore);
+          return;
+        }
+      }
+
+      // Se não tem store selecionada e tem lojas, seleciona a primeira
+      if (storesData.length > 0) {
+        setCurrentStoreState(storesData[0]);
+        localStorage.setItem('currentStoreId', storesData[0].id.toString());
+      }
+
+    } catch (error) {
+      console.error('Erro ao carregar lojas:', error);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const savedStoreId = localStorage.getItem('current_store_id');
-    if (savedStoreId) {
-      const storeId = parseInt(savedStoreId);
-      setCurrentStoreIdState(storeId);
-      setCurrentStore({
-        id: storeId,
-        name: `Loja ${storeId}`,
-        subdomain: `loja-${storeId}`,
-      });
+  const setCurrentStore = (store: Store | null) => {
+    setCurrentStoreState(store);
+    if (store) {
+      localStorage.setItem('currentStoreId', store.id.toString());
+    } else {
+      localStorage.removeItem('currentStoreId');
     }
-  }, [user, canManageMultipleStores]);
+  };
 
-  const setCurrentStoreId = (storeId: number) => {
-    setCurrentStoreIdState(storeId);
-    localStorage.setItem('current_store_id', storeId.toString());
+  const setCurrentStoreId = (id: number | null) => {
+    if (id === null) {
+      setCurrentStoreState(null);
+      localStorage.removeItem('currentStoreId');
+    } else {
+      const store = stores.find(s => s.id === id);
+      if (store) {
+        setCurrentStoreState(store);
+        localStorage.setItem('currentStoreId', id.toString());
+      }
+    }
+  };
 
-    // Atualiza currentStore também
-    setCurrentStore({
-      id: storeId,
-      name: `Loja ${storeId}`,
-      subdomain: `loja-${storeId}`,
-    });
+  const refreshStores = async () => {
+    await loadStores();
   };
 
   return (
-    <StoreContext.Provider value={{
-      currentStoreId,
-      currentStore,
-      setCurrentStoreId,
-      setCurrentStore,
-      canManageMultipleStores
-    }}>
+    <StoreContext.Provider
+      value={{
+        stores,
+        currentStore,
+        currentStoreId: currentStore?.id || null,
+        setCurrentStore,
+        setCurrentStoreId,
+        canManageMultipleStores,
+        loading,
+        refreshStores,
+      }}
+    >
       {children}
     </StoreContext.Provider>
   );
 }
 
 export function useStore() {
-  return useContext(StoreContext);
+  const context = useContext(StoreContext);
+  if (!context) {
+    throw new Error('useStore deve ser usado dentro de StoreProvider');
+  }
+  return context;
 }

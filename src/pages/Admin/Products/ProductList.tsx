@@ -1,276 +1,366 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Edit, Trash2, Package, Eye, EyeOff, Search } from 'lucide-react';
-import productService, { Product } from '../../../services/product.service';
+import {
+  Package,
+  Plus,
+  Search,
+  Edit2,
+  Trash2,
+  Eye,
+  EyeOff,
+  AlertCircle
+} from 'lucide-react';
+import api from '../../../services/api';
 import { useStore } from '../../../contexts/StoreContext';
-import AdminLayout from '../../../components/Layout/AdminLayout';
+import { formatCurrency } from '../../../utils/format';
 
-export default function ProductList() {
-  const { currentStoreId, currentStore } = useStore();
+interface Product {
+  id: number;
+  name: string;
+  description?: string;
+  price: string;
+  category_id: number;
+  store_id: number;
+  sku?: string;
+  image_url?: string;
+  stock: number;
+  track_stock: boolean;
+  min_stock: number;
+  is_available: boolean;
+  is_active: boolean;
+  created_at: string;
+  category?: {
+    id: number;
+    name: string;
+  };
+}
 
+const ProductList = () => {
+  const { currentStore } = useStore();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [deleteId, setDeleteId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    if (currentStoreId) loadProducts();
-  }, [currentStoreId]);
+    if (currentStore) {
+      fetchProducts();
+    }
+  }, [currentStore]);
 
-  const loadProducts = async () => {
+  const fetchProducts = async () => {
+    if (!currentStore) {
+      setError('Selecione uma loja primeiro');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const data = await productService.list(currentStoreId!);
-      setProducts(data);
-    } catch {
-      setError('Erro ao carregar produtos');
+      setError('');
+
+      console.log('Buscando produtos para loja:', currentStore.id);
+
+      let productsData = [];
+
+      // Tente diferentes rotas
+      try {
+        // Primeiro tenta a rota admin
+        const response = await api.get('/products/admin', {
+          params: {
+            store_id: currentStore.id,
+            only_available: false
+          }
+        });
+        productsData = response.data || [];
+        console.log('Produtos encontrados (admin):', productsData.length);
+      } catch (error1: any) {
+        console.log('Rota /products/admin não funcionou, tentando /products...');
+
+        try {
+          // Tenta rota pública com mais parâmetros
+          const response = await api.get('/products/', {
+            params: {
+              store_id: currentStore.id,
+              limit: 100
+            }
+          });
+          productsData = response.data || [];
+          console.log('Produtos encontrados (pública):', productsData.length);
+        } catch (error2: any) {
+          console.error('Todas as rotas falharam:', error2);
+          throw error2;
+        }
+      }
+
+      setProducts(productsData);
+
+    } catch (error: any) {
+      console.error('Erro ao buscar produtos:', error);
+      setError(`Erro ao carregar produtos: ${error.message || 'Verifique sua conexão'}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (id: number) => {
-    try {
-      await productService.delete(id, currentStoreId!);
-      setProducts(prev => prev.filter(p => p.id !== id));
-      setDeleteId(null);
-    } catch {
-      alert('Erro ao deletar produto');
-    }
-  };
-
-  const toggleAvailability = async (product: Product) => {
-    try {
-      const updated = await productService.toggleAvailability(
-        product.id,
-        currentStoreId!,
-        !product.is_available
-      );
-      setProducts(prev => prev.map(p => p.id === product.id ? updated : p));
-    } catch {
-      alert('Erro ao alterar disponibilidade');
-    }
-  };
-
-  const filtered = products.filter(product =>
+  const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.sku?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  return (
-    <AdminLayout
-      title="Produtos"
-      subtitle={currentStore ? `Loja: ${currentStore.name}` : 'Selecione uma loja'}
-      showBackButton={true}
-    >
-      {/* Mensagem quando não há loja selecionada */}
-      {!currentStoreId && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6 text-center">
-          <Package className="w-12 h-12 text-yellow-400 mx-auto mb-3" />
-          <h3 className="text-lg font-medium text-yellow-800 mb-2">
-            Selecione uma loja
-          </h3>
-          <p className="text-yellow-700">
-            Escolha uma loja no seletor acima para ver os produtos
-          </p>
-        </div>
-      )}
+  const handleToggleAvailability = async (productId: number, isAvailable: boolean) => {
+    if (!currentStore) return;
 
-      {/* Cabeçalho da página de produtos */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Gerenciar Produtos</h2>
-          <p className="text-slate-600 mt-1">
-            {currentStoreId
-              ? `Total de produtos: ${products.length}`
-              : 'Selecione uma loja para começar'}
-          </p>
-        </div>
-        {currentStoreId && (
-          <Link
-            to="/admin/products/new"
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-          >
-            <Plus size={18} />
-            Novo Produto
-          </Link>
-        )}
+    try {
+      await api.patch(`/products/${productId}/availability`, null, {
+        params: {
+          is_available: !isAvailable,
+          store_id: currentStore.id
+        }
+      });
+      fetchProducts(); // Recarrega a lista
+    } catch (error: any) {
+      console.error('Erro ao alterar disponibilidade:', error);
+      alert(`Erro: ${error.message}`);
+    }
+  };
+
+  const handleDelete = async (productId: number) => {
+    if (!window.confirm('Tem certeza que deseja excluir este produto?')) return;
+
+    try {
+      await api.delete(`/products/${productId}`, {
+        params: { store_id: currentStore!.id }
+      });
+      fetchProducts();
+    } catch (error: any) {
+      console.error('Erro ao excluir produto:', error);
+      alert(`Erro: ${error.message}`);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
       </div>
+    );
+  }
 
-      {/* Barra de busca e filtros */}
-      {currentStoreId && (
-        <div className="mb-6 bg-white p-4 rounded-xl border border-slate-200">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Buscar produtos por nome, descrição ou SKU..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border-2 border-slate-200 rounded-lg focus:border-red-500"
-            />
-          </div>
-        </div>
-      )}
+  return (
+    <div className="min-h-screen bg-slate-50">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-red-600 to-orange-500 border-b-4 border-orange-600">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h1 className="text-3xl font-black text-white mb-2">Produtos</h1>
+              <p className="text-orange-100">
+                {currentStore ? `Loja: ${currentStore.name}` : 'Selecione uma loja'}
+              </p>
+            </div>
 
-      {/* Conteúdo principal */}
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-red-800">{error}</p>
-        </div>
-      )}
-
-      {loading ? (
-        <div className="text-center py-16">
-          <div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-600">Carregando produtos...</p>
-        </div>
-      ) : !currentStoreId ? null : filtered.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-2xl border border-slate-200">
-          <Package className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-slate-900 mb-2">
-            {searchTerm ? 'Nenhum produto encontrado' : 'Nenhum produto cadastrado'}
-          </h3>
-          <p className="text-slate-500 mb-6">
-            {searchTerm
-              ? 'Tente ajustar os termos da busca'
-              : 'Comece adicionando seu primeiro produto ao cardápio'
-            }
-          </p>
-          {!searchTerm && (
             <Link
               to="/admin/products/new"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              className="flex items-center gap-2 px-6 py-3 bg-white text-orange-600 rounded-xl font-bold hover:bg-orange-50 transition-colors"
             >
-              <Plus size={18} />
-              Adicionar Primeiro Produto
+              <Plus size={20} />
+              Novo Produto
             </Link>
-          )}
-        </div>
-      ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">Produto</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">Categoria</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">Preço</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">Estoque</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">Status</th>
-                  <th className="px-6 py-4 text-right text-sm font-semibold text-slate-900">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {filtered.map(product => (
-                  <tr key={product.id} className="hover:bg-slate-50">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        {product.image_url ? (
-                          <img
-                            src={product.image_url}
-                            alt={product.name}
-                            className="w-12 h-12 rounded-lg object-cover"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 bg-slate-200 rounded-lg flex items-center justify-center">
-                            <Package className="w-6 h-6 text-slate-400" />
-                          </div>
-                        )}
-                        <div>
-                          <div className="font-medium text-slate-900">{product.name}</div>
-                          {product.sku && (
-                            <div className="text-sm text-slate-500">SKU: {product.sku}</div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-900">
-                      {product.category?.name}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-slate-900">
-                        R$ {parseFloat(product.current_price).toFixed(2)}
-                      </div>
-                      {product.promotional_price && (
-                        <div className="text-xs text-slate-500 line-through">
-                          R$ {parseFloat(product.price).toFixed(2)}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className={`text-sm font-medium ${product.track_stock && product.stock <= product.min_stock
-                          ? 'text-orange-600'
-                          : 'text-slate-900'
-                        }`}>
-                        {product.track_stock ? product.stock : 'Não controlado'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <button
-                        onClick={() => toggleAvailability(product)}
-                        className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${product.is_available
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-slate-100 text-slate-800'
-                          }`}
-                      >
-                        {product.is_available ? <Eye size={14} /> : <EyeOff size={14} />}
-                        {product.is_available ? 'Disponível' : 'Indisponível'}
-                      </button>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex justify-end gap-2">
-                        <Link
-                          to={`/admin/products/edit/${product.id}`}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Editar"
-                        >
-                          <Edit size={16} />
-                        </Link>
-                        <button
-                          onClick={() => setDeleteId(product.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Excluir"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Modal de Confirmação de Exclusão */}
-      {deleteId && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">Confirmar exclusão</h3>
-            <p className="text-slate-600 mb-6">
-              Tem certeza que deseja excluir este produto? Esta ação não pode ser desfeita.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setDeleteId(null)}
-                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => handleDelete(deleteId)}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-              >
-                Excluir
-              </button>
+      {/* Conteúdo */}
+      <div className="container mx-auto px-4 py-8">
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+            <div className="flex items-center gap-2 text-red-700">
+              <AlertCircle size={20} />
+              <p>{error}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Barra de busca */}
+        <div className="mb-8">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+            <div>
+              <h2 className="text-lg font-bold text-slate-800">Gerenciar Produtos</h2>
+              <p className="text-slate-600">
+                Total de produtos: <span className="font-bold text-orange-600">{products.length}</span>
+              </p>
+            </div>
+
+            <div className="relative w-full md:w-auto">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
+              <input
+                type="text"
+                placeholder="Buscar produtos por nome, descrição ou SKU..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full md:w-96 pl-10 pr-4 py-3 border-2 border-slate-200 rounded-xl focus:border-orange-500 focus:ring-0 focus:outline-none transition-colors"
+              />
             </div>
           </div>
         </div>
-      )}
-    </AdminLayout>
+
+        {!currentStore ? (
+          <div className="text-center py-12">
+            <div className="mx-auto w-24 h-24 bg-orange-100 rounded-full flex items-center justify-center mb-4">
+              <Package size={40} className="text-orange-500" />
+            </div>
+            <h3 className="text-lg font-medium text-slate-900 mb-2">
+              Selecione uma loja primeiro
+            </h3>
+            <p className="text-slate-500 mb-6">
+              Use o seletor de lojas no cabeçalho para escolher qual loja gerenciar
+            </p>
+          </div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="mx-auto w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+              <Package size={40} className="text-slate-400" />
+            </div>
+            <h3 className="text-lg font-medium text-slate-900 mb-2">
+              Nenhum produto encontrado
+            </h3>
+            <p className="text-slate-500 mb-6">
+              {searchTerm
+                ? 'Tente buscar com outros termos'
+                : `Esta loja ainda não tem produtos cadastrados`
+              }
+            </p>
+            {!searchTerm && (
+              <Link
+                to="/admin/products/new"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-red-600 to-orange-500 text-white rounded-xl font-bold hover:shadow-xl transition-all"
+              >
+                <Plus size={20} />
+                Criar Primeiro Produto
+              </Link>
+            )}
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl border-2 border-slate-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y-2 divide-slate-100">
+                <thead className="bg-gradient-to-r from-slate-50 to-orange-50">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Produto
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Categoria
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Preço
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Estoque
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Ações
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredProducts.map((product) => (
+                    <tr key={product.id} className="hover:bg-orange-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center">
+                          {product.image_url ? (
+                            <img
+                              src={product.image_url}
+                              alt={product.name}
+                              className="w-12 h-12 rounded-lg object-cover mr-3 border border-slate-200"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mr-3 border border-orange-200">
+                              <Package size={24} className="text-orange-600" />
+                            </div>
+                          )}
+                          <div>
+                            <div className="font-bold text-slate-900">{product.name}</div>
+                            <div className="text-sm text-slate-500">
+                              {product.sku && `SKU: ${product.sku}`}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-slate-900">
+                          {product.category?.name || 'Sem categoria'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="font-bold text-slate-900">
+                          {formatCurrency(parseFloat(product.price))}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center">
+                          <span className={`font-medium ${product.track_stock && product.stock <= product.min_stock
+                              ? 'text-red-600'
+                              : 'text-slate-900'
+                            }`}>
+                            {product.stock}
+                          </span>
+                          {product.track_stock && product.stock <= product.min_stock && (
+                            <span className="ml-2 text-xs text-red-500 font-bold">BAIXO</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${product.is_available
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-red-100 text-red-700'
+                          }`}>
+                          {product.is_available ? 'Disponível' : 'Indisponível'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleToggleAvailability(product.id, product.is_available)}
+                            className={`p-2 rounded-lg transition-colors ${product.is_available
+                                ? 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100'
+                                : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                              }`}
+                            title={product.is_available ? 'Tornar indisponível' : 'Tornar disponível'}
+                          >
+                            {product.is_available ? <EyeOff size={18} /> : <Eye size={18} />}
+                          </button>
+                          <Link
+                            to={`/admin/products/edit/${product.id}`}
+                            className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                            title="Editar"
+                          >
+                            <Edit2 size={18} />
+                          </Link>
+                          <button
+                            onClick={() => handleDelete(product.id)}
+                            className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                            title="Excluir"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
-}
+};
+
+export default ProductList;

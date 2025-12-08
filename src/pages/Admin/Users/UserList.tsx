@@ -4,7 +4,7 @@ import { Search, PlusCircle, Edit3, Trash2, RefreshCw } from "lucide-react";
 import userService, { User } from "../../../services/user.service";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useStore } from "../../../contexts/StoreContext";
-import AdminLayout from "../../../components/Layout/AdminLayout"; // ADICIONE
+import AdminLayout from "../../../components/Layout/AdminLayout"; 
 
 export default function UserList() {
   const [users, setUsers] = useState<User[]>([]);

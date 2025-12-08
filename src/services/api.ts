@@ -53,6 +53,43 @@ api.interceptors.response.use(
 
     return Promise.reject(error);
   }
+  
+);
+// No arquivo api.ts, adicione:
+api.interceptors.request.use(
+  (config: InternalAxiosRequestConfig) => {
+    console.log('🌐 API Request:', {
+      url: config.url,
+      method: config.method,
+      params: config.params,
+      headers: config.headers
+    });
+    // ... resto do código
+    return config;
+  },
+  (error) => {
+    console.error('🌐 API Request Error:', error);
+    return Promise.reject(error);
+  }
 );
 
+api.interceptors.response.use(
+  (response) => {
+    console.log('🌐 API Response:', {
+      url: response.config.url,
+      status: response.status,
+      data: response.data
+    });
+    return response;
+  },
+  (error) => {
+    console.error('🌐 API Response Error:', {
+      url: error.config?.url,
+      status: error.response?.status,
+      message: error.message,
+      data: error.response?.data
+    });
+    return Promise.reject(error);
+  }
+);
 export default api;
