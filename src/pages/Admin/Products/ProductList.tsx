@@ -8,11 +8,13 @@ import {
   Trash2,
   Eye,
   EyeOff,
-  AlertCircle
+  AlertCircle,
+  Filter
 } from 'lucide-react';
 import api from '../../../services/api';
 import { useStore } from '../../../contexts/StoreContext';
 import { formatCurrency } from '../../../utils/format';
+import AdminPageWrapper from '../../../components/layouts/AdminPageWrapper';
 
 interface Product {
   id: number;
@@ -36,20 +38,25 @@ interface Product {
 }
 
 const ProductList = () => {
-  const { currentStore } = useStore();
+  const { currentStore, currentStoreId } = useStore();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<number | ''>('');
+  const [availabilityFilter, setAvailabilityFilter] = useState<boolean | ''>('');
 
   useEffect(() => {
-    if (currentStore) {
+    if (currentStoreId) {
       fetchProducts();
+    } else {
+      setProducts([]);
+      setLoading(false);
     }
-  }, [currentStore]);
+  }, [currentStoreId]);
 
   const fetchProducts = async () => {
-    if (!currentStore) {
+    if (!currentStoreId) {
       setError('Selecione uma loja primeiro');
       setLoading(false);
       return;
@@ -59,29 +66,28 @@ const ProductList = () => {
       setLoading(true);
       setError('');
 
-      console.log('Buscando produtos para loja:', currentStore.id);
+      console.log('Buscando produtos para loja:', currentStoreId);
 
-      let productsData = [];
+      let productsData: Product[] = [];
 
-      // Tente diferentes rotas
+      // Tente a rota admin primeiro
       try {
-        // Primeiro tenta a rota admin
         const response = await api.get('/products/admin', {
           params: {
-            store_id: currentStore.id,
-            only_available: false
+            store_id: currentStoreId,
+            only_available: false,
+            limit: 100
           }
         });
         productsData = response.data || [];
         console.log('Produtos encontrados (admin):', productsData.length);
       } catch (error1: any) {
-        console.log('Rota /products/admin não funcionou, tentando /products...');
+        console.log('Rota admin não funcionou, tentando pública...');
 
         try {
-          // Tenta rota pública com mais parâmetros
           const response = await api.get('/products/', {
             params: {
-              store_id: currentStore.id,
+              store_id: currentStoreId,
               limit: 100
             }
           });
@@ -89,7 +95,7 @@ const ProductList = () => {
           console.log('Produtos encontrados (pública):', productsData.length);
         } catch (error2: any) {
           console.error('Todas as rotas falharam:', error2);
-          throw error2;
+          throw new Error('Não foi possível carregar os produtos');
         }
       }
 
@@ -97,32 +103,53 @@ const ProductList = () => {
 
     } catch (error: any) {
       console.error('Erro ao buscar produtos:', error);
-      setError(`Erro ao carregar produtos: ${error.message || 'Verifique sua conexão'}`);
+      setError(error.message || 'Erro ao carregar produtos');
+      setProducts([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.sku?.toLowerCase().includes(searchTerm.toLowerCase())
+  // Obter categorias únicas para filtro
+  const categories = Array.from(
+    new Set(
+      products
+        .map(p => p.category)
+        .filter(Boolean)
+        .map(c => ({ id: c!.id, name: c!.name }))
+    )
   );
 
+  const filteredProducts = products.filter(product => {
+    // Filtro de busca
+    const matchesSearch = !searchTerm ||
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.sku?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // Filtro de categoria
+    const matchesCategory = !categoryFilter || product.category_id === categoryFilter;
+
+    // Filtro de disponibilidade
+    const matchesAvailability = availabilityFilter === '' || product.is_available === availabilityFilter;
+
+    return matchesSearch && matchesCategory && matchesAvailability;
+  });
+
   const handleToggleAvailability = async (productId: number, isAvailable: boolean) => {
-    if (!currentStore) return;
+    if (!currentStoreId) return;
 
     try {
       await api.patch(`/products/${productId}/availability`, null, {
         params: {
           is_available: !isAvailable,
-          store_id: currentStore.id
+          store_id: currentStoreId
         }
       });
-      fetchProducts(); // Recarrega a lista
+      fetchProducts();
     } catch (error: any) {
       console.error('Erro ao alterar disponibilidade:', error);
-      alert(`Erro: ${error.message}`);
+      alert(`Erro: ${error.response?.data?.detail || error.message}`);
     }
   };
 
@@ -131,235 +158,261 @@ const ProductList = () => {
 
     try {
       await api.delete(`/products/${productId}`, {
-        params: { store_id: currentStore!.id }
+        params: { store_id: currentStoreId }
       });
       fetchProducts();
     } catch (error: any) {
       console.error('Erro ao excluir produto:', error);
-      alert(`Erro: ${error.message}`);
+      alert(`Erro: ${error.response?.data?.detail || error.message}`);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-red-600 to-orange-500 border-b-4 border-orange-600">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <h1 className="text-3xl font-black text-white mb-2">Produtos</h1>
-              <p className="text-orange-100">
-                {currentStore ? `Loja: ${currentStore.name}` : 'Selecione uma loja'}
-              </p>
+    <AdminPageWrapper
+      title="Produtos"
+      subtitle={currentStore ? `Loja: ${currentStore.name}` : 'Selecione uma loja'}
+      loading={loading}
+      action={
+        <Link
+          to="/admin/products/new"
+          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-orange-500 text-white rounded-lg hover:opacity-90 transition-opacity text-sm font-medium"
+        >
+          <Plus size={16} />
+          Novo Produto
+        </Link>
+      }
+    >
+      {error && (
+        <div className="p-4 border-b border-red-200 bg-red-50">
+          <div className="flex items-center gap-2 text-red-700">
+            <AlertCircle size={18} />
+            <p className="text-sm">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Filtros */}
+      <div className="p-4 border-b border-gray-200">
+        <div className="flex flex-col gap-4">
+          {/* Barra de busca */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              type="text"
+              placeholder="Buscar produtos por nome, descrição ou SKU..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none text-sm"
+            />
+          </div>
+
+          {/* Filtros adicionais */}
+          <div className="flex flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <Filter size={16} className="text-gray-400" />
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value ? Number(e.target.value) : '')}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 outline-none text-sm"
+              >
+                <option value="">Todas as categorias</option>
+                {categories.map(category => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <Link
-              to="/admin/products/new"
-              className="flex items-center gap-2 px-6 py-3 bg-white text-orange-600 rounded-xl font-bold hover:bg-orange-50 transition-colors"
+            <select
+              value={availabilityFilter === '' ? '' : availabilityFilter.toString()}
+              onChange={(e) => setAvailabilityFilter(e.target.value === '' ? '' : e.target.value === 'true')}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 outline-none text-sm"
             >
-              <Plus size={20} />
-              Novo Produto
-            </Link>
+              <option value="">Todos os status</option>
+              <option value="true">Disponíveis</option>
+              <option value="false">Indisponíveis</option>
+            </select>
           </div>
         </div>
       </div>
 
       {/* Conteúdo */}
-      <div className="container mx-auto px-4 py-8">
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
-            <div className="flex items-center gap-2 text-red-700">
-              <AlertCircle size={20} />
-              <p>{error}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Barra de busca */}
-        <div className="mb-8">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-            <div>
-              <h2 className="text-lg font-bold text-slate-800">Gerenciar Produtos</h2>
-              <p className="text-slate-600">
-                Total de produtos: <span className="font-bold text-orange-600">{products.length}</span>
-              </p>
-            </div>
-
-            <div className="relative w-full md:w-auto">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
-              <input
-                type="text"
-                placeholder="Buscar produtos por nome, descrição ou SKU..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full md:w-96 pl-10 pr-4 py-3 border-2 border-slate-200 rounded-xl focus:border-orange-500 focus:ring-0 focus:outline-none transition-colors"
-              />
-            </div>
-          </div>
-        </div>
-
-        {!currentStore ? (
+      <div className="overflow-x-auto">
+        {!loading && !currentStoreId ? (
           <div className="text-center py-12">
-            <div className="mx-auto w-24 h-24 bg-orange-100 rounded-full flex items-center justify-center mb-4">
-              <Package size={40} className="text-orange-500" />
+            <div className="mx-auto w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4">
+              <Package size={32} className="text-orange-500" />
             </div>
-            <h3 className="text-lg font-medium text-slate-900 mb-2">
-              Selecione uma loja primeiro
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              Selecione uma loja
             </h3>
-            <p className="text-slate-500 mb-6">
-              Use o seletor de lojas no cabeçalho para escolher qual loja gerenciar
+            <p className="text-gray-500">
+              Use o seletor de lojas no cabeçalho para gerenciar produtos
             </p>
           </div>
-        ) : filteredProducts.length === 0 ? (
+        ) : !loading && filteredProducts.length === 0 ? (
           <div className="text-center py-12">
-            <div className="mx-auto w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-              <Package size={40} className="text-slate-400" />
+            <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+              <Package size={32} className="text-gray-400" />
             </div>
-            <h3 className="text-lg font-medium text-slate-900 mb-2">
-              Nenhum produto encontrado
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              {searchTerm || categoryFilter || availabilityFilter !== ''
+                ? 'Nenhum produto encontrado'
+                : 'Nenhum produto cadastrado'}
             </h3>
-            <p className="text-slate-500 mb-6">
-              {searchTerm
-                ? 'Tente buscar com outros termos'
-                : `Esta loja ainda não tem produtos cadastrados`
-              }
+            <p className="text-gray-500 mb-4">
+              {searchTerm || categoryFilter || availabilityFilter !== ''
+                ? 'Tente ajustar os filtros de busca'
+                : 'Comece criando seu primeiro produto'}
             </p>
-            {!searchTerm && (
+            {!searchTerm && !categoryFilter && availabilityFilter === '' && (
               <Link
                 to="/admin/products/new"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-red-600 to-orange-500 text-white rounded-xl font-bold hover:shadow-xl transition-all"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors text-sm font-medium"
               >
-                <Plus size={20} />
+                <Plus size={16} />
                 Criar Primeiro Produto
               </Link>
             )}
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border-2 border-slate-100 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y-2 divide-slate-100">
-                <thead className="bg-gradient-to-r from-slate-50 to-orange-50">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
-                      Produto
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
-                      Categoria
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
-                      Preço
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
-                      Estoque
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
-                      Ações
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredProducts.map((product) => (
-                    <tr key={product.id} className="hover:bg-orange-50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center">
-                          {product.image_url ? (
-                            <img
-                              src={product.image_url}
-                              alt={product.name}
-                              className="w-12 h-12 rounded-lg object-cover mr-3 border border-slate-200"
-                            />
-                          ) : (
-                            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mr-3 border border-orange-200">
-                              <Package size={24} className="text-orange-600" />
-                            </div>
-                          )}
-                          <div>
-                            <div className="font-bold text-slate-900">{product.name}</div>
-                            <div className="text-sm text-slate-500">
-                              {product.sku && `SKU: ${product.sku}`}
-                            </div>
-                          </div>
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Produto
+                </th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Categoria
+                </th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Preço
+                </th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Estoque
+                </th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Ações
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {filteredProducts.map((product) => (
+                <tr key={product.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center">
+                      {product.image_url ? (
+                        <img
+                          src={product.image_url}
+                          alt={product.name}
+                          className="w-10 h-10 rounded-lg object-cover mr-3 border border-gray-200"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center mr-3 border border-orange-200">
+                          <Package size={18} className="text-orange-600" />
                         </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-slate-900">
-                          {product.category?.name || 'Sem categoria'}
+                      )}
+                      <div>
+                        <div className="font-medium text-gray-900">{product.name}</div>
+                        <div className="text-xs text-gray-500">
+                          {product.sku ? `SKU: ${product.sku}` : `ID: ${product.id}`}
                         </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="font-bold text-slate-900">
-                          {formatCurrency(parseFloat(product.price))}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center">
-                          <span className={`font-medium ${product.track_stock && product.stock <= product.min_stock
-                              ? 'text-red-600'
-                              : 'text-slate-900'
-                            }`}>
-                            {product.stock}
-                          </span>
-                          {product.track_stock && product.stock <= product.min_stock && (
-                            <span className="ml-2 text-xs text-red-500 font-bold">BAIXO</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${product.is_available
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-red-100 text-red-700'
-                          }`}>
-                          {product.is_available ? 'Disponível' : 'Indisponível'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleToggleAvailability(product.id, product.is_available)}
-                            className={`p-2 rounded-lg transition-colors ${product.is_available
-                                ? 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100'
-                                : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
-                              }`}
-                            title={product.is_available ? 'Tornar indisponível' : 'Tornar disponível'}
-                          >
-                            {product.is_available ? <EyeOff size={18} /> : <Eye size={18} />}
-                          </button>
-                          <Link
-                            to={`/admin/products/edit/${product.id}`}
-                            className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
-                            title="Editar"
-                          >
-                            <Edit2 size={18} />
-                          </Link>
-                          <button
-                            onClick={() => handleDelete(product.id)}
-                            className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
-                            title="Excluir"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="text-sm text-gray-900">
+                      {product.category?.name || 'Sem categoria'}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="font-bold text-gray-900">
+                      {formatCurrency(parseFloat(product.price))}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center">
+                      <span className={`font-medium ${product.track_stock && product.stock <= product.min_stock
+                        ? 'text-red-600'
+                        : 'text-gray-900'
+                        }`}>
+                        {product.stock}
+                      </span>
+                      {product.track_stock && product.stock <= product.min_stock && (
+                        <span className="ml-2 text-xs text-red-500 font-medium">BAIXO</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-1 text-xs rounded-full font-medium ${product.is_available
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                      }`}>
+                      {product.is_available ? 'Disponível' : 'Indisponível'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleToggleAvailability(product.id, product.is_available)}
+                        className={`p-1.5 rounded transition-colors ${product.is_available
+                            ? 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100'
+                            : 'bg-green-50 text-green-600 hover:bg-green-100'
+                          }`}
+                        title={product.is_available ? 'Tornar indisponível' : 'Tornar disponível'}
+                      >
+                        {product.is_available ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                      <Link
+                        to={`/admin/products/edit/${product.id}`}
+                        className="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
+                        title="Editar"
+                      >
+                        <Edit2 size={16} />
+                      </Link>
+                      <button
+                        onClick={() => handleDelete(product.id)}
+                        className="p-1.5 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
+                        title="Excluir"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
-    </div>
+
+      {/* Footer */}
+      {!loading && filteredProducts.length > 0 && (
+        <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <p className="text-sm text-gray-600">
+                Mostrando <span className="font-medium">{filteredProducts.length}</span> de <span className="font-medium">{products.length}</span> produtos
+              </p>
+              {products.some(p => p.track_stock && p.stock <= p.min_stock) && (
+                <p className="text-xs text-red-600 mt-1">
+                  ⚠️ {products.filter(p => p.track_stock && p.stock <= p.min_stock).length} produto(s) com estoque baixo
+                </p>
+              )}
+            </div>
+            {currentStore && (
+              <p className="text-xs text-gray-500">
+                Loja: {currentStore.name}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </AdminPageWrapper>
   );
 };
 

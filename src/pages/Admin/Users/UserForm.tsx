@@ -5,14 +5,15 @@ import { toast } from "react-toastify";
 import userService, { UserCreate, UserUpdate } from "../../../services/user.service";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useStore } from "../../../contexts/StoreContext";
+import AdminPageWrapper from "../../../components/layouts/AdminPageWrapper";
 
 export default function UserForm() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = !!id;
 
-  const { user } = useAuth();
-  const { currentStore } = useStore();
+  const { user: currentUser } = useAuth();
+  const { currentStore, currentStoreId } = useStore();
 
   const [formData, setFormData] = useState<UserCreate>({
     email: "",
@@ -28,8 +29,18 @@ export default function UserForm() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (isEditing && id) loadUser(parseInt(id));
-  }, [id]);
+    if (isEditing && id) {
+      loadUser(parseInt(id));
+    } else {
+      // Preencher store_id automaticamente se for STORE_MANAGER
+      if (currentUser?.role === "STORE_MANAGER" && currentStoreId) {
+        setFormData(prev => ({
+          ...prev,
+          store_id: currentStoreId
+        }));
+      }
+    }
+  }, [id, currentStoreId, currentUser?.role]);
 
   const loadUser = async (userId: number) => {
     try {
@@ -43,9 +54,10 @@ export default function UserForm() {
         password: "",
         store_id: data.store_id || null,
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error("Erro ao carregar usuário:", err);
       setError("Erro ao carregar usuário.");
+      toast.error("Erro ao carregar usuário.");
     } finally {
       setLoading(false);
     }
@@ -59,13 +71,25 @@ export default function UserForm() {
     try {
       // 🔒 Se o usuário atual for um gerente, força vincular à loja atual
       const finalData = { ...formData };
-      if (user?.role === "STORE_MANAGER") {
-        finalData.store_id = currentStore?.id || null;
+      if (currentUser?.role === "STORE_MANAGER" && currentStoreId) {
+        finalData.store_id = currentStoreId;
+      }
+
+      // Validar dados
+      if (!finalData.email && !finalData.phone) {
+        throw new Error("Email ou telefone é obrigatório");
+      }
+
+      if (!isEditing && !finalData.password) {
+        throw new Error("Senha é obrigatória para novos usuários");
       }
 
       if (isEditing && id) {
         const updateData: UserUpdate = { ...finalData };
-        delete (updateData as any).password;
+        // Não enviar password vazio na atualização
+        if (!updateData.password) {
+          delete updateData.password;
+        }
         await userService.update(parseInt(id), updateData);
         toast.success("Usuário atualizado com sucesso!");
       } else {
@@ -76,7 +100,7 @@ export default function UserForm() {
       navigate("/admin/users");
     } catch (err: any) {
       console.error(err);
-      const msg = err.response?.data?.detail || "Erro ao salvar usuário";
+      const msg = err.response?.data?.detail || err.message || "Erro ao salvar usuário";
       setError(msg);
       toast.error(msg);
     } finally {
@@ -84,43 +108,63 @@ export default function UserForm() {
     }
   };
 
-  if (loading)
-    return (
-      <div className="text-center py-16 text-slate-500">Carregando usuário...</div>
-    );
+  const getRoleOptions = () => {
+    const roles = [
+      { value: "CUSTOMER", label: "Cliente" },
+      { value: "DELIVERY_PERSON", label: "Entregador" },
+      { value: "STORE_MANAGER", label: "Gerente Loja" },
+      { value: "COMPANY_ADMIN", label: "Admin Empresa" },
+      { value: "PLATFORM_ADMIN", label: "Admin Plataforma" },
+    ];
+
+    // Filtrar roles baseado no usuário atual
+    if (currentUser?.role === "STORE_MANAGER") {
+      return roles.filter(r =>
+        r.value === "CUSTOMER" ||
+        r.value === "DELIVERY_PERSON" ||
+        r.value === "STORE_MANAGER"
+      );
+    }
+
+    if (currentUser?.role === "COMPANY_ADMIN") {
+      return roles.filter(r => r.value !== "PLATFORM_ADMIN");
+    }
+
+    return roles;
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-4">
-          <button
-            onClick={() => navigate("/admin/users")}
-            className="p-2 hover:bg-slate-100 rounded-lg"
-          >
-            <ArrowLeft className="w-5 h-5 text-slate-600" />
-          </button>
-          <h1 className="text-xl font-bold text-slate-900">
-            {isEditing ? "Editar Usuário" : "Novo Usuário"}
-          </h1>
-        </div>
-      </header>
-
-      <main className="max-w-4xl mx-auto px-4 py-8">
+    <AdminPageWrapper
+      title={isEditing ? "Editar Usuário" : "Novo Usuário"}
+      subtitle={currentStore ? `Loja: ${currentStore.name}` : ''}
+      loading={loading}
+      action={
+        <button
+          onClick={() => navigate("/admin/users")}
+          className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Voltar
+        </button>
+      }
+    >
+      <div className="p-4 sm:p-6">
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex gap-2 items-center">
-            <AlertCircle className="w-5 h-5 text-red-600" />
-            <p className="text-red-700">
-              {typeof error === "string" ? error : JSON.stringify(error)}
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex gap-2 items-start">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <p className="text-red-700 text-sm">
+              {error}
             </p>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl border p-6 sm:p-8">
-          <div className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Nome */}
             <div>
-              <label className="block text-sm font-medium mb-2">Nome completo *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nome completo *
+              </label>
               <input
                 type="text"
                 value={formData.full_name || ""}
@@ -128,13 +172,16 @@ export default function UserForm() {
                   setFormData({ ...formData, full_name: e.target.value })
                 }
                 required
-                className="w-full border px-4 py-3 rounded-lg focus:border-red-500 outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
+                placeholder="Digite o nome completo"
               />
             </div>
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium mb-2">Email *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email *
+              </label>
               <input
                 type="email"
                 value={formData.email || ""}
@@ -142,27 +189,34 @@ export default function UserForm() {
                   setFormData({ ...formData, email: e.target.value })
                 }
                 required
-                className="w-full border px-4 py-3 rounded-lg focus:border-red-500 outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
+                placeholder="usuario@exemplo.com"
               />
             </div>
 
             {/* Telefone */}
             <div>
-              <label className="block text-sm font-medium mb-2">Telefone</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Telefone *
+              </label>
               <input
                 type="text"
                 value={formData.phone || ""}
                 onChange={(e) =>
                   setFormData({ ...formData, phone: e.target.value })
                 }
-                className="w-full border px-4 py-3 rounded-lg focus:border-red-500 outline-none"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
+                placeholder="(11) 99999-9999"
               />
             </div>
 
             {/* Senha (somente na criação) */}
             {!isEditing && (
               <div>
-                <label className="block text-sm font-medium mb-2">Senha *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Senha *
+                </label>
                 <input
                   type="password"
                   required
@@ -170,14 +224,21 @@ export default function UserForm() {
                   onChange={(e) =>
                     setFormData({ ...formData, password: e.target.value })
                   }
-                  className="w-full border px-4 py-3 rounded-lg focus:border-red-500 outline-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
+                  placeholder="••••••••"
+                  minLength={6}
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Mínimo 6 caracteres
+                </p>
               </div>
             )}
 
             {/* Função */}
             <div>
-              <label className="block text-sm font-medium mb-2">Função *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Função *
+              </label>
               <select
                 value={formData.role}
                 onChange={(e) =>
@@ -186,20 +247,22 @@ export default function UserForm() {
                     role: e.target.value as UserCreate["role"],
                   })
                 }
-                className="w-full border px-4 py-3 rounded-lg focus:border-red-500 outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
               >
-                <option value="PLATFORM_ADMIN">Platform Admin</option>
-                <option value="COMPANY_ADMIN">Company Admin</option>
-                <option value="STORE_MANAGER">Store Manager</option>
-                <option value="DELIVERY_PERSON">Delivery</option>
-                <option value="CUSTOMER">Customer</option>
+                {getRoleOptions().map(role => (
+                  <option key={role.value} value={role.value}>
+                    {role.label}
+                  </option>
+                ))}
               </select>
             </div>
 
-            {/* Loja (visível apenas para Admins de plataforma) */}
-            {user?.role === "PLATFORM_ADMIN" && (
+            {/* Loja (visível apenas para Admins de plataforma e Company) */}
+            {(currentUser?.role === "PLATFORM_ADMIN" || currentUser?.role === "COMPANY_ADMIN") && (
               <div>
-                <label className="block text-sm font-medium mb-2">Loja (opcional)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Loja
+                </label>
                 <input
                   type="number"
                   value={formData.store_id ?? ""}
@@ -211,38 +274,35 @@ export default function UserForm() {
                         : null,
                     })
                   }
-                  placeholder="ID da loja"
-                  className="w-full border px-4 py-3 rounded-lg focus:border-red-500 outline-none"
+                  placeholder="ID da loja (opcional)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Deixe em branco para usuário sem loja específica
+                </p>
               </div>
             )}
           </div>
 
-          <div className="flex gap-4 mt-8 pt-6 border-t">
+          <div className="flex gap-4 pt-6 border-t border-gray-200">
             <button
               type="button"
               onClick={() => navigate("/admin/users")}
-              className="flex-1 border border-slate-200 py-3 rounded-lg hover:bg-slate-50"
+              className="flex-1 px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 bg-gradient-to-r from-red-600 to-orange-500 text-white py-3 rounded-lg hover:scale-105 transition-all"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-orange-500 text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity font-medium"
             >
-              {saving ? (
-                "Salvando..."
-              ) : (
-                <>
-                  <Save className="inline w-5 h-5 mr-2" />
-                  Salvar
-                </>
-              )}
+              <Save className="w-4 h-4" />
+              {saving ? "Salvando..." : (isEditing ? "Atualizar" : "Criar Usuário")}
             </button>
           </div>
         </form>
-      </main>
-    </div>
+      </div>
+    </AdminPageWrapper>
   );
 }

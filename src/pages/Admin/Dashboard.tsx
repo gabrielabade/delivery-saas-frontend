@@ -8,17 +8,17 @@ import {
   Package,
   Plus,
   ChefHat,
-  LucideIcon
+  LucideIcon,
+  ArrowRight,
+  Calendar,
+  Clock,
+  BarChart3
 } from 'lucide-react';
 import api from '../../services/api';
 import { useStore } from '../../contexts/StoreContext';
 import { formatCurrency } from '../../utils/format';
+import AdminPageWrapper from '../../components/layouts/AdminPageWrapper';
 
-// ==========================================
-// 🎨 COMPONENTES REUTILIZÁVEIS
-// ==========================================
-
-// Interface para MetricCard
 interface MetricCardProps {
   title: string;
   value: string | number;
@@ -27,7 +27,6 @@ interface MetricCardProps {
   color?: 'orange' | 'green' | 'blue' | 'purple';
 }
 
-// Card de Métrica
 const MetricCard: React.FC<MetricCardProps> = ({
   title,
   value,
@@ -45,88 +44,24 @@ const MetricCard: React.FC<MetricCardProps> = ({
   const trendColor = trend && trend > 0 ? 'text-emerald-600' : 'text-red-600';
 
   return (
-    <div className="bg-white rounded-2xl border-2 border-slate-100 p-6 hover:border-orange-200 hover:shadow-xl transition-all relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-32 h-32 opacity-5">
-        <div className={`w-full h-full bg-gradient-to-br ${colorClasses[color]} rounded-full transform translate-x-8 -translate-y-8`} />
-      </div>
-
-      <div className="relative">
-        <div className="flex items-center justify-between mb-4">
-          <div className={`p-3 bg-gradient-to-br ${colorClasses[color]} rounded-xl`}>
-            <Icon className="w-6 h-6 text-white" />
+    <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 hover:border-orange-300 hover:shadow-md transition-all">
+      <div className="flex items-center justify-between mb-4">
+        <div className={`p-3 bg-gradient-to-br ${colorClasses[color]} rounded-xl`}>
+          <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+        </div>
+        {trend !== undefined && (
+          <div className={`flex items-center gap-1 text-sm font-bold ${trendColor}`}>
+            <TrendingUp className={`w-4 h-4 ${trend < 0 ? 'rotate-180' : ''}`} />
+            {Math.abs(trend)}%
           </div>
-          {trend !== undefined && (
-            <div className={`flex items-center gap-1 text-sm font-bold ${trendColor}`}>
-              <TrendingUp className={`w-4 h-4 ${trend < 0 ? 'rotate-180' : ''}`} />
-              {Math.abs(trend)}%
-            </div>
-          )}
-        </div>
-
-        <h3 className="text-3xl font-black text-slate-900 mb-1">{value}</h3>
-        <p className="text-sm text-slate-600">{title}</p>
+        )}
       </div>
+
+      <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">{value}</h3>
+      <p className="text-sm text-gray-600">{title}</p>
     </div>
   );
 };
-
-// Interface para PrimaryButton
-interface PrimaryButtonProps {
-  children: React.ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-  className?: string;
-  icon?: LucideIcon;
-  type?: 'button' | 'submit' | 'reset';
-}
-
-// Botão Primário
-const PrimaryButton: React.FC<PrimaryButtonProps> = ({
-  children,
-  onClick,
-  disabled = false,
-  className = '',
-  icon: Icon,
-  type = 'button'
-}) => {
-  return (
-    <button
-      type={type}
-      onClick={onClick}
-      disabled={disabled}
-      className={`flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-red-600 to-orange-500 text-white rounded-xl font-bold hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 ${className}`}
-    >
-      {Icon && <Icon className="w-5 h-5" />}
-      {children}
-    </button>
-  );
-};
-
-// Interface para PageHeader
-interface PageHeaderProps {
-  title: string;
-  subtitle?: string;
-  action?: React.ReactNode;
-}
-
-// Header Padrão
-const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, action }) => (
-  <div className="bg-gradient-to-r from-red-600 to-orange-500 border-b-4 border-orange-600">
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-white mb-2">{title}</h1>
-          {subtitle && <p className="text-orange-100">{subtitle}</p>}
-        </div>
-        {action && <div>{action}</div>}
-      </div>
-    </div>
-  </div>
-);
-
-// ==========================================
-// 📊 DASHBOARD PRINCIPAL
-// ==========================================
 
 const Dashboard: React.FC = () => {
   const { currentStore } = useStore();
@@ -137,6 +72,7 @@ const Dashboard: React.FC = () => {
     newCustomers: 0,
     conversionRate: 0
   });
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
 
   useEffect(() => {
     if (currentStore) {
@@ -153,12 +89,12 @@ const Dashboard: React.FC = () => {
       // Data de hoje
       const today = new Date().toISOString().split('T')[0];
 
-      // Buscar pedidos
+      // Buscar pedidos recentes
       const ordersRes = await api.get('/orders/', {
         params: {
           store_id: currentStore.id,
           skip: 0,
-          limit: 100
+          limit: 10
         }
       });
 
@@ -178,9 +114,11 @@ const Dashboard: React.FC = () => {
       setStats({
         todaySales,
         activeOrders,
-        newCustomers: 18, // Fallback
+        newCustomers: 18,
         conversionRate: todayOrders.length > 0 ? (activeOrders / todayOrders.length * 100) : 0
       });
+
+      setRecentOrders(orders.slice(0, 5));
 
     } catch (error: any) {
       console.error('Erro ao carregar dados do dashboard:', error);
@@ -191,6 +129,7 @@ const Dashboard: React.FC = () => {
         newCustomers: 18,
         conversionRate: 4.2
       });
+      setRecentOrders([]);
     } finally {
       setLoading(false);
     }
@@ -198,58 +137,61 @@ const Dashboard: React.FC = () => {
 
   const quickActions = [
     { title: 'Novo Pedido', icon: ShoppingCart, path: '/admin/orders/new', color: 'orange' },
-    { title: 'Gerenciar Produtos', icon: Package, path: '/admin/products', color: 'blue' },
-    { title: 'Ver Clientes', icon: Users, path: '/admin/customers', color: 'green' },
+    { title: 'Ver Produtos', icon: Package, path: '/admin/products', color: 'blue' },
+    { title: 'Gerenciar Categorias', icon: ChefHat, path: '/admin/categories', color: 'green' },
     { title: 'Ver Usuários', icon: Users, path: '/admin/users', color: 'purple' },
   ];
 
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Saudação */}
-      <div className="bg-gradient-to-r from-red-600 to-orange-500 border-b-4 border-orange-600">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <AdminPageWrapper
+      title="Dashboard"
+      subtitle={currentStore ? `Loja: ${currentStore.name}` : 'Selecione uma loja'}
+      loading={loading}
+    >
+      <div className="p-4 sm:p-6">
+        {/* Saudação */}
+        <div className="mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
             <div>
-              <h1 className="text-3xl font-black text-white mb-2">Dashboard</h1>
-              <p className="text-orange-100">Visão geral do seu negócio</p>
+              <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-2">
+                Olá, {currentStore?.name || 'Admin'}!
+              </h2>
+              <p className="text-gray-600">
+                Seja bem-vindo ao painel administrativo do ClickFome
+              </p>
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">
-                  {currentStore?.name?.charAt(0) || 'LJ'}
-                </span>
+              <div className="p-2 bg-orange-100 rounded-lg">
+                <Calendar className="w-5 h-5 text-orange-600" />
               </div>
               <div>
-                <p className="font-medium text-white">{currentStore?.name || 'Lanchonete do João'}</p>
-                <p className="text-sm text-orange-200">Dashboard Administrativo</p>
+                <p className="text-sm text-gray-900 font-medium">
+                  {new Date().toLocaleDateString('pt-BR', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long'
+                  })}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                </p>
               </div>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Conteúdo principal */}
-      <div className="container mx-auto px-4 py-8">
-        {/* Saudação */}
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold text-slate-900 mb-2">
-            Olá, {currentStore?.name || 'Admin'}!
-          </h2>
-          <p className="text-slate-600">
-            Seja bem-vindo ao painel administrativo do ClickFome
-          </p>
-          <p className="text-sm text-slate-500 mt-1">
-            Hoje é {new Date().toLocaleDateString('pt-BR', {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'long'
-            })}
-          </p>
-        </div>
 
         {/* Grid de métricas */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 sm:mb-8">
           <MetricCard
             title="Vendas Hoje"
             value={formatCurrency(stats.todaySales)}
@@ -280,41 +222,97 @@ const Dashboard: React.FC = () => {
           />
         </div>
 
-        {/* Ações Rápidas */}
-        <div className="bg-white rounded-2xl border-2 border-slate-100 p-6 mb-8">
-          <h3 className="text-lg font-bold text-slate-900 mb-6">Ações Rápidas</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {quickActions.map((action, i) => (
-              <Link
-                key={i}
-                to={action.path}
-                className="flex flex-col items-center gap-3 p-4 rounded-xl border-2 border-slate-100 hover:border-orange-200 hover:bg-orange-50 transition-all group"
-              >
-                <div className={`p-3 bg-gradient-to-br ${action.color === 'orange' ? 'from-orange-500 to-red-500' :
-                  action.color === 'blue' ? 'from-blue-500 to-cyan-600' :
-                    action.color === 'green' ? 'from-emerald-500 to-green-600' :
-                      'from-purple-500 to-pink-600'} rounded-xl group-hover:scale-110 transition-transform`}
+        {/* Grid de duas colunas: Ações Rápidas e Pedidos Recentes */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Ações Rápidas */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-gray-900">Ações Rápidas</h3>
+              <BarChart3 className="w-5 h-5 text-gray-400" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {quickActions.map((action, i) => (
+                <Link
+                  key={i}
+                  to={action.path}
+                  className="flex flex-col items-center gap-3 p-4 rounded-lg border-2 border-gray-100 hover:border-orange-200 hover:bg-orange-50 transition-all group"
                 >
-                  <action.icon className="w-6 h-6 text-white" />
+                  <div className={`p-3 bg-gradient-to-br ${action.color === 'orange' ? 'from-orange-500 to-red-500' :
+                      action.color === 'blue' ? 'from-blue-500 to-cyan-600' :
+                        action.color === 'green' ? 'from-emerald-500 to-green-600' :
+                          'from-purple-500 to-pink-600'
+                    } rounded-xl group-hover:scale-110 transition-transform`}>
+                    <action.icon className="w-5 h-5 text-white" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-700 group-hover:text-orange-600 text-center">
+                    {action.title}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Pedidos Recentes */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-gray-900">Pedidos Recentes</h3>
+              <Clock className="w-5 h-5 text-gray-400" />
+            </div>
+            <div className="space-y-4">
+              {recentOrders.length > 0 ? (
+                recentOrders.map((order: any) => (
+                  <div key={order.id} className="flex items-center justify-between p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-medium text-gray-900">#{order.order_number}</span>
+                        <span className={`px-2 py-1 text-xs rounded-full ${order.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
+                            order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-blue-100 text-blue-800'
+                          }`}>
+                          {order.status}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        {order.customer_name} • {formatDate(order.created_at)}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-gray-900">{formatCurrency(parseFloat(order.total))}</p>
+                      <p className="text-xs text-gray-500">{order.items_count} itens</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <ShoppingCart className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500">Nenhum pedido recente</p>
                 </div>
-                <span className="text-sm font-medium text-slate-700 group-hover:text-orange-600">
-                  {action.title}
-                </span>
+              )}
+            </div>
+            {recentOrders.length > 0 && (
+              <Link
+                to="/admin/orders"
+                className="mt-6 flex items-center justify-center gap-2 text-orange-600 hover:text-orange-700 font-medium"
+              >
+                Ver todos os pedidos
+                <ArrowRight className="w-4 h-4" />
               </Link>
-            ))}
+            )}
           </div>
         </div>
 
-        {/* Botão de novo pedido destacado */}
-        <div className="mt-8">
-          <Link to="/admin/orders/new">
-            <PrimaryButton icon={Plus}>
-              Criar Novo Pedido
-            </PrimaryButton>
+        {/* Botão de novo pedido */}
+        <div className="text-center">
+          <Link
+            to="/admin/orders/new"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-red-600 to-orange-500 text-white rounded-lg hover:opacity-90 transition-opacity font-bold shadow-lg"
+          >
+            <Plus className="w-5 h-5" />
+            Criar Novo Pedido
           </Link>
         </div>
       </div>
-    </div>
+    </AdminPageWrapper>
   );
 };
 

@@ -1,68 +1,77 @@
-import api from "./api";
+// services/user.service.ts (atualização)
+import api from './api';
 
 export interface User {
   id: number;
-  email: string;
-  full_name: string;
-  phone?: string;
-  role: 'PLATFORM_ADMIN' | 'COMPANY_ADMIN' | 'STORE_MANAGER' | 'DELIVERY_PERSON' | 'CUSTOMER';
+  email: string | null;
+  full_name: string | null;
+  phone: string | null;
+  role: string;
+  store_id: number | null;
   is_active: boolean;
-  store_id?: number | null;
-  company_id?: number | null; 
+  created_at: string;
 }
 
 export interface UserCreate {
-  email: string;
-  full_name: string;
-  phone?: string;
-  role: string;
-  password: string;
+  email?: string | null;
+  full_name?: string | null;
+  phone?: string | null;
+  role?: string;
+  password?: string | null;
   store_id?: number | null;
 }
 
 export interface UserUpdate {
-  email?: string;
-  full_name?: string;
-  phone?: string;
-  role?: string;
-  password?: string;
+  email?: string | null;
+  full_name?: string | null;
+  phone?: string | null;
+  password?: string | null;
+  role?: string | null;
   store_id?: number | null;
+  is_active?: boolean | null;
 }
 
-export interface UserListParams {
-  search?: string;
-  role?: string;
-  store_id?: number | null;
+export interface UserListResponse {
+  users: User[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
-const userService = {
-  async list(params?: UserListParams): Promise<{ users: User[] }> {
-    const res = await api.get("/users/", { params });
-    return res.data;
-  },
+class UserService {
+  async list(params?: {
+    skip?: number;
+    limit?: number;
+    store_id?: number | null;
+    role?: string | null;
+    search?: string | null;
+  }): Promise<UserListResponse> {
+    const response = await api.get('/users/', { params });
+    return response.data;
+  }
 
   async getById(id: number): Promise<User> {
-    const res = await api.get(`/users/${id}`);
-    return res.data;
-  },
+    const response = await api.get(`/users/${id}`);
+    return response.data;
+  }
 
   async create(data: UserCreate): Promise<User> {
-    const res = await api.post("/users/", data);
-    return res.data;
-  },
+    const response = await api.post('/users/', data);
+    return response.data;
+  }
 
   async update(id: number, data: UserUpdate): Promise<User> {
-    const res = await api.put(`/users/${id}`, data);
-    return res.data;
-  },
+    const response = await api.put(`/users/${id}`, data);
+    return response.data;
+  }
 
-  async deactivate(id: number) {
-    await api.post(`/users/${id}/deactivate`);
-  },
+  async deactivate(id: number): Promise<void> {
+    await api.delete(`/users/${id}`);
+  }
 
-  async activate(id: number) {
+  async activate(id: number): Promise<void> {
     await api.post(`/users/${id}/activate`);
-  },
-};
+  }
+}
 
-export default userService;
+export default new UserService();
