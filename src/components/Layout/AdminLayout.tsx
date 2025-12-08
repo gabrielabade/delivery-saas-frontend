@@ -49,12 +49,12 @@ const AdminLayout = ({
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
 
-      {/* Header Global */}
+      {/* HEADER SUPERIOR */}
       <header className="bg-white border-b-2 border-slate-100 sticky top-0 z-50">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
 
-            {/* Menu Mobile + Logo */}
+            {/* MENU MOBILE + LOGO */}
             <div className="flex items-center">
               <button
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -76,7 +76,7 @@ const AdminLayout = ({
               </Link>
             </div>
 
-            {/* Loja atual + Usuário */}
+            {/* LOJA + USUÁRIO */}
             <div className="flex items-center gap-4">
               <StoreSelector />
 
@@ -110,7 +110,7 @@ const AdminLayout = ({
           </div>
         </div>
 
-        {/* Header da Página */}
+        {/* HEADER DA PÁGINA */}
         {(title || subtitle) && (
           <div className="bg-white border-t border-slate-200 px-4 py-3">
             <div className="container mx-auto flex items-center gap-3">
@@ -138,7 +138,7 @@ const AdminLayout = ({
 
       <div className="flex flex-1">
 
-        {/* Sidebar Desktop */}
+        {/* MENU LATERAL DESKTOP */}
         <aside className="hidden lg:block w-64 bg-white border-r min-h-full">
           <nav className="p-4">
             <div className="mb-8">
@@ -162,6 +162,7 @@ const AdminLayout = ({
               </div>
             </div>
 
+            {/* INFO DA LOJA ATUAL */}
             {currentStore && (
               <div className="p-4 bg-gradient-to-r from-orange-50 to-red-50 rounded-xl border border-orange-100">
                 <p className="text-xs font-medium text-orange-700 mb-2">Loja Atual</p>
@@ -178,7 +179,7 @@ const AdminLayout = ({
                 </div>
                 <div className="mt-3 pt-3 border-t border-orange-100">
                   <p className="text-xs text-slate-500">
-                    Todos os dados listados são desta loja
+                    Todos os dados exibidos são desta loja
                   </p>
                 </div>
               </div>
@@ -186,14 +187,14 @@ const AdminLayout = ({
           </nav>
         </aside>
 
-        {/* Conteúdo da página */}
+        {/* CONTEÚDO DA PÁGINA */}
         <main className="flex-1 p-4">
           {children || <Outlet />}
         </main>
 
       </div>
 
-      {/* Menu Mobile */}
+      {/* MENU MOBILE */}
       {isMenuOpen && (
         <div className="lg:hidden fixed inset-0 z-50">
           <div
